@@ -1923,7 +1923,7 @@ const NotebookPanel=()=>{
           :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
           <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
-        <button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"✏️":"🎨"}</button>
+        <button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"🎨":"🎨"}</button>
         <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>
       </div>
       {pageDrawMode&&<div style={{display:"flex",flexDirection:"column",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
@@ -1964,8 +1964,15 @@ const NotebookPanel=()=>{
               } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type),position:"relative",zIndex:1}}/>
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}}>
-              <div style={{position:"absolute",top:0,left:0,width:500*pageZoom,minHeight:800*pageZoom,...ts(page.type),
-                color:"rgba(232,224,240,.4)",whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0,fontSize:`${16*pageZoom}px`,padding:`${16*pageZoom}px`}}>{textRef.current}</div>
+              {(()=>{const baseTs=ts(page.type);const scaledPadding=(()=>{
+                const p=baseTs.padding;if(typeof p==="number")return `${p*pageZoom}px`;
+                const parts=p.split(" ").map(v=>parseFloat(v)*pageZoom+"px");return parts.join(" ");
+              })();return <div style={{position:"absolute",top:0,left:0,width:500*pageZoom,minHeight:800*pageZoom,
+                padding:scaledPadding,fontSize:`${(baseTs.fontSize||15)*pageZoom}px`,
+                lineHeight:typeof baseTs.lineHeight==="string"&&baseTs.lineHeight.endsWith("px")?`${parseFloat(baseTs.lineHeight)*pageZoom}px`:baseTs.lineHeight,
+                fontFamily:baseTs.fontFamily||"'Nunito',sans-serif",
+                color:"rgba(232,224,240,.4)",whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0,
+                boxSizing:"border-box"}}>{textRef.current}</div>;})()}
               <canvas ref={canvasCallbackRef} width={500} height={800}
                 style={{width:500*pageZoom,height:800*pageZoom,touchAction:"pan-x pan-y pinch-zoom",background:"transparent",display:"block",position:"relative",zIndex:1}}/>
             </div>}
