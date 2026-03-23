@@ -1736,7 +1736,7 @@ const NotebookPanel=()=>{
     ctx.clearRect(0,0,c.width,c.height);drawImgRef.current=null;
     const d=readNb();const src=d.pages?.[pageIdxRef.current]?.drawData||null;
     if(src){drawImgRef.current=src;const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=src;}};
-  const onDown=React.useCallback((e)=>{e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
+  const onDown=React.useCallback((e)=>{if(e.touches&&e.touches.length>1)return;e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;const t=e.touches?e.touches[0]:e;
     const x=(t.clientX-r.left)*sx,y=(t.clientY-r.top)*sy;
     if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=20;}
@@ -1746,7 +1746,7 @@ const NotebookPanel=()=>{
     ctx.beginPath();ctx.arc(x,y,eraserRef.current?10:sizeRef.current/2,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.moveTo(x,y);
     isDrawingRef.current=true;},[]);
-  const onMove=React.useCallback((e)=>{if(!isDrawingRef.current)return;e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
+  const onMove=React.useCallback((e)=>{if(e.touches&&e.touches.length>1){isDrawingRef.current=false;return;}if(!isDrawingRef.current)return;e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;const t=e.touches?e.touches[0]:e;
     ctx.lineTo((t.clientX-r.left)*sx,(t.clientY-r.top)*sy);ctx.stroke();},[]);
   const onUp=React.useCallback(()=>{if(!isDrawingRef.current)return;isDrawingRef.current=false;
@@ -1932,7 +1932,7 @@ const NotebookPanel=()=>{
           :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
           <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
-        <button onClick={()=>{saveAll();setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"✏️":"🎨"}</button>
+        <button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"✏️":"🎨"}</button>
         <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>
       </div>
       {pageDrawMode&&<div style={{display:"flex",flexDirection:"column",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
@@ -1941,6 +1941,10 @@ const NotebookPanel=()=>{
             {drawEraser?"🧽":"✏️"}</button>
           {!drawEraser&&["#fff","#f5576c","#feca57","#43e97b","#60a5fa","#f093fb","#fb923c"].map(c=>(
             <div key={c} onClick={()=>setDrawColor(c)} style={{width:24,height:24,borderRadius:6,background:c,border:drawColor===c?"2px solid #fff":"2px solid rgba(255,255,255,.1)",cursor:"pointer"}}/>))}
+          <div style={{flex:1}}/>
+          <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 6px",fontSize:14})}>−</button>
+          <span style={{fontSize:10,opacity:.4,minWidth:28,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
+          <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 6px",fontSize:14})}>+</button>
         </div>
         {!drawEraser&&<div style={{display:"flex",alignItems:"center",gap:4}}>
           {[1,2,3,4,6,8,10,12].map(s=>(<div key={s} onClick={()=>setDrawSize(s)}
@@ -1949,13 +1953,13 @@ const NotebookPanel=()=>{
             <div style={{width:Math.max(s,2),height:Math.max(s,2),borderRadius:"50%",background:drawColor}}/></div>))}
         </div>}
       </div>}
-      <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
+      {!pageDrawMode&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
         <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 8px"})}>−</button>
         <span style={{fontSize:11,opacity:.4}}>{Math.round(pageZoom*100)}%</span>
         <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 8px"})}>+</button>
-      </div>
+      </div>}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
-        <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:`${100/pageZoom}%`}}>
+        <div style={{transform:pageDrawMode?undefined:`scale(${pageZoom})`,transformOrigin:"top left",width:pageDrawMode?undefined:`${100/pageZoom}%`}}>
           <PageBg type={page.type}>
             {!pageDrawMode&&<div>
               {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",height:800,pointerEvents:"none",opacity:.7,zIndex:2}}/>}
@@ -1969,10 +1973,10 @@ const NotebookPanel=()=>{
               } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type),position:"relative",zIndex:1}}/>
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}}>
-              <div style={{position:"absolute",top:0,left:0,width:"100%",minHeight:800,...ts(page.type),
-                color:"rgba(232,224,240,.4)",whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0}}>{textRef.current}</div>
+              <div style={{position:"absolute",top:0,left:0,width:500*pageZoom,minHeight:800*pageZoom,...ts(page.type),
+                color:"rgba(232,224,240,.4)",whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0,fontSize:`${16*pageZoom}px`,padding:`${16*pageZoom}px`}}>{textRef.current}</div>
               <canvas ref={canvasCallbackRef} width={500} height={800}
-                style={{width:500,height:800,touchAction:"none",background:"transparent",display:"block",position:"relative",zIndex:1}}/>
+                style={{width:500*pageZoom,height:800*pageZoom,touchAction:"pan-x pan-y pinch-zoom",background:"transparent",display:"block",position:"relative",zIndex:1}}/>
             </div>}
           </PageBg>
         </div></div></div>);
