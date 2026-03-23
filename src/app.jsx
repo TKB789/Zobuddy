@@ -4150,6 +4150,10 @@ function SpiritAnimals(){
   };
   const Confetti=()=>confetti?<div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:999}}>{Array.from({length:20}).map((_,i)=><div key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:-20,fontSize:18,animation:`confetti ${1.5+Math.random()*1.5}s linear forwards`,animationDelay:`${Math.random()*.5}s`}}>{["🎉","⭐","✨","🌟","💫"][Math.floor(Math.random()*5)]}</div>)}</div>:null;
 
+  // Settings search state (must be before early returns to satisfy React hooks rules)
+  const[searchQuery,setSearchQuery]=useState("");
+  const[searchResults,setSearchResults]=useState([]);
+
   // ─── WELCOME ──────────────────────────────────────────────────────
   if(screen==="welcome")return(
     <div style={S.app}><style>{CSS}</style>
@@ -4384,8 +4388,6 @@ function SpiritAnimals(){
   );
 
   // ─── SETTINGS PANEL ────────────────────────────────────────────────
-  const[searchQuery,setSearchQuery]=useState("");
-  const[searchResults,setSearchResults]=useState([]);
   const doSearch=(q)=>{
     setSearchQuery(q);if(!q.trim()||q.trim().length<2){setSearchResults([]);return;}
     const term=q.trim().toLowerCase();const results=[];
