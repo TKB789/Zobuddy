@@ -1300,13 +1300,15 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     const[answer,setAnswer]=useState(null);
     const[guess,setGuess]=useState([null,null,null,null,null]);
     const[won,setWon]=useState(false);
-    const[pool,setPool]=useState([]);
+    const[poolSlots,setPoolSlots]=useState([null,null,null,null,null]); // fixed 5 slots
     const[best,setBest]=useState(()=>{try{return Number(localStorage.getItem("zo_best_lineup"))||0;}catch{return 0;}});
     const[attempts,setAttempts]=useState(0);
     const[lastResult,setLastResult]=useState(null);
-    const[dragging,setDragging]=useState(null); // {buddy, fromSlot:number|null, x, y}
-    const slotRefs=React.useRef([]);
+    const[dragging,setDragging]=useState(null); // {buddy,fromArea:'platform'|'pool',fromIdx,x,y,startX,startY,isDrag}
+    const platRefs=React.useRef([]);
+    const poolRefs=React.useRef([]);
     const dragRef=React.useRef(null);
+    const DRAG_THRESHOLD=8;
 
     const initGame=()=>{
       const shuffled=[...BUDDIES].sort(()=>Math.random()-.5);
@@ -1315,7 +1317,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       let poolOrder=[...picked];
       do{poolOrder=[...picked].sort(()=>Math.random()-.5);}
       while(poolOrder.every((b,i)=>b===picked[i]));
-      setPool(poolOrder);
+      setPoolSlots(poolOrder);
       setGuess([null,null,null,null,null]);
       setWon(false);setAttempts(0);setLastResult(null);setDragging(null);
     };
@@ -1333,75 +1335,89 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       }
     };
 
-    const placeInSlot=(slotIdx,buddy)=>{
-      setGuess(prev=>{const n=[...prev];const ex=n.indexOf(buddy);if(ex>=0)n[ex]=null;n[slotIdx]=buddy;return n;});
-      setPool(prev=>prev.filter(b=>b!==buddy));
-      setLastResult(null);
+    // Find which platform slot a point is over
+    const findPlatSlotAt=(x,y)=>{
+      for(let i=0;i<5;i++){const el=platRefs.current[i];if(!el)continue;
+        const r=el.getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return i;}
+      return-1;
     };
-    const removeFromSlot=(slotIdx)=>{
-      const buddy=guess[slotIdx];
-      setGuess(prev=>{const n=[...prev];n[slotIdx]=null;return n;});
-      if(buddy)setPool(prev=>[...prev,buddy]);
-      setLastResult(null);
-    };
-
-    // Find which slot a point is over
-    const findSlotAt=(x,y)=>{
-      for(let i=0;i<5;i++){
-        const el=slotRefs.current[i];if(!el)continue;
-        const r=el.getBoundingClientRect();
-        if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return i;
-      }
+    // Find which pool slot a point is over
+    const findPoolSlotAt=(x,y)=>{
+      for(let i=0;i<5;i++){const el=poolRefs.current[i];if(!el)continue;
+        const r=el.getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return i;}
       return-1;
     };
 
-    // Drag handlers
-    const startDrag=(buddy,fromSlot,x,y)=>{
-      dragRef.current={buddy,fromSlot};
-      setDragging({buddy,fromSlot,x,y});
-    };
-    const moveDrag=(x,y)=>{
-      if(!dragRef.current)return;
-      setDragging(prev=>prev?{...prev,x,y}:null);
-    };
-    const endDrag=(x,y)=>{
-      if(!dragRef.current)return;
-      const{buddy,fromSlot}=dragRef.current;
-      const targetSlot=findSlotAt(x,y);
-      if(targetSlot>=0){
-        // Dropping on a platform slot
-        if(fromSlot!==null){
-          // Moving from one slot to another — swap
-          setGuess(prev=>{
-            const n=[...prev];
-            const swapBuddy=n[targetSlot];
-            n[fromSlot]=swapBuddy;n[targetSlot]=buddy;
-            return n;
-          });
-        } else {
-          placeInSlot(targetSlot,buddy);
-        }
-        setLastResult(null);
-      } else if(fromSlot!==null){
-        // Dragged from platform but not onto a slot — return to pool
-        removeFromSlot(fromSlot);
+    // Move buddy between areas
+    const moveBuddy=(buddy,fromArea,fromIdx,toArea,toIdx)=>{
+      if(fromArea===toArea&&fromIdx===toIdx)return;
+      setLastResult(null);
+      if(fromArea==="pool"&&toArea==="platform"){
+        setPoolSlots(prev=>{const n=[...prev];n[fromIdx]=null;return n;});
+        setGuess(prev=>{const n=[...prev];
+          // If target slot has a buddy, send it to the pool slot we came from
+          if(n[toIdx]){setPoolSlots(pp=>{const nn=[...pp];nn[fromIdx]=n[toIdx];return nn;});}
+          n[toIdx]=buddy;return n;});
+      } else if(fromArea==="platform"&&toArea==="pool"){
+        setGuess(prev=>{const n=[...prev];n[fromIdx]=null;return n;});
+        setPoolSlots(prev=>{const n=[...prev];
+          if(n[toIdx]){setGuess(gg=>{const nn=[...gg];nn[fromIdx]=n[toIdx];return nn;});}
+          n[toIdx]=buddy;return n;});
+      } else if(fromArea==="platform"&&toArea==="platform"){
+        setGuess(prev=>{const n=[...prev];const swap=n[toIdx];n[toIdx]=buddy;n[fromIdx]=swap;return n;});
+      } else if(fromArea==="pool"&&toArea==="pool"){
+        setPoolSlots(prev=>{const n=[...prev];const swap=n[toIdx];n[toIdx]=buddy;n[fromIdx]=swap;return n;});
       }
-      dragRef.current=null;setDragging(null);
     };
 
-    const onTouchStart=(buddy,fromSlot)=>(e)=>{
+    // Tap handlers (when drag threshold not met)
+    const tapFromPool=(idx)=>{
+      const buddy=poolSlots[idx];if(!buddy)return;
+      const emptyPlat=guess.indexOf(null);
+      if(emptyPlat>=0){moveBuddy(buddy,"pool",idx,"platform",emptyPlat);}
+    };
+    const tapFromPlatform=(idx)=>{
+      const buddy=guess[idx];if(!buddy)return;
+      const emptyPool=poolSlots.indexOf(null);
+      if(emptyPool>=0){moveBuddy(buddy,"platform",idx,"pool",emptyPool);}
+    };
+
+    const onTouchStart=(buddy,fromArea,fromIdx)=>(e)=>{
+      if(!buddy)return;
       e.preventDefault();
       const t=e.touches[0];
-      startDrag(buddy,fromSlot,t.clientX,t.clientY);
+      const d={buddy,fromArea,fromIdx,x:t.clientX,y:t.clientY,startX:t.clientX,startY:t.clientY,isDrag:false};
+      dragRef.current=d;setDragging(d);
     };
     const onTouchMove=(e)=>{
       if(!dragRef.current)return;
       e.preventDefault();
-      const t=e.touches[0];moveDrag(t.clientX,t.clientY);
+      const t=e.touches[0];
+      const dx=t.clientX-dragRef.current.startX,dy=t.clientY-dragRef.current.startY;
+      const isDrag=dragRef.current.isDrag||Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD;
+      dragRef.current={...dragRef.current,x:t.clientX,y:t.clientY,isDrag};
+      setDragging({...dragRef.current});
     };
     const onTouchEnd=(e)=>{
       if(!dragRef.current)return;
-      const t=e.changedTouches[0];endDrag(t.clientX,t.clientY);
+      const d=dragRef.current;
+      const t=e.changedTouches[0];
+      if(!d.isDrag){
+        // It was a tap
+        if(d.fromArea==="pool")tapFromPool(d.fromIdx);
+        else tapFromPlatform(d.fromIdx);
+      } else {
+        // It was a drag — find drop target
+        const platIdx=findPlatSlotAt(t.clientX,t.clientY);
+        const poolIdx=findPoolSlotAt(t.clientX,t.clientY);
+        if(platIdx>=0){
+          moveBuddy(d.buddy,d.fromArea,d.fromIdx,"platform",platIdx);
+        } else if(poolIdx>=0){
+          moveBuddy(d.buddy,d.fromArea,d.fromIdx,"pool",poolIdx);
+        }
+        // If dropped nowhere, stays where it was
+      }
+      dragRef.current=null;setDragging(null);
     };
 
     if(!answer)return null;
@@ -1419,7 +1435,9 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       </div>
     </div>);
 
-    const isDraggingBuddy=(b)=>dragging&&dragging.buddy===b;
+    const isDraggingFrom=(area,idx)=>dragging&&dragging.isDrag&&dragging.fromArea===area&&dragging.fromIdx===idx;
+    const hoverPlat=dragging&&dragging.isDrag?findPlatSlotAt(dragging.x,dragging.y):-1;
+    const hoverPool=dragging&&dragging.isDrag?findPoolSlotAt(dragging.x,dragging.y):-1;
 
     return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 16px",overflow:"auto",touchAction:"none",userSelect:"none",WebkitUserSelect:"none"}}
       onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
@@ -1443,35 +1461,39 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
         <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>LINEUP PLATFORM</div>
         <div style={{display:"flex",gap:6,justifyContent:"center"}}>
           {guess.map((b,i)=>{
-            const isOver=dragging&&findSlotAt(dragging.x,dragging.y)===i;
-            return(<div key={i} ref={el=>slotRefs.current[i]=el}
-              onClick={()=>{if(b&&!dragging)removeFromSlot(i);}}
-              onTouchStart={b?onTouchStart(b,i):undefined}
+            const isHover=hoverPlat===i;
+            const isDrag=isDraggingFrom("platform",i);
+            return(<div key={"p"+i} ref={el=>platRefs.current[i]=el}
+              onTouchStart={b?onTouchStart(b,"platform",i):undefined}
               style={{width:56,height:64,borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-                background:isOver?"rgba(167,139,250,.25)":b?"rgba(167,139,250,.15)":"rgba(255,255,255,.03)",
-                border:isOver?"2px solid rgba(167,139,250,.7)":b?"2px solid rgba(167,139,250,.4)":"2px dashed rgba(255,255,255,.1)",
+                background:isHover?"rgba(167,139,250,.3)":b?"rgba(167,139,250,.15)":"rgba(255,255,255,.03)",
+                border:isHover?"2px solid rgba(167,139,250,.7)":b?"2px solid rgba(167,139,250,.4)":"2px dashed rgba(255,255,255,.12)",
                 cursor:b?"grab":"default",transition:"border .1s, background .1s",
-                opacity:b&&isDraggingBuddy(b)?.3:1}}>
-              {b&&!isDraggingBuddy(b)?<span style={{fontSize:30}}>{b}</span>:!b?<span style={{fontSize:16,opacity:.15}}>{i+1}</span>:null}
+                opacity:isDrag?.25:1}}>
+              {b&&!isDrag?<span style={{fontSize:30}}>{b}</span>:<span style={{fontSize:16,opacity:.15}}>{i+1}</span>}
             </div>);
           })}
         </div>
       </div>
 
-      {/* Starting area */}
+      {/* Starting area - fixed 5 slots with underlines */}
       <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:"12px 8px",marginBottom:12}}>
-        <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>DRAG OR TAP TO PLACE</div>
-        <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",minHeight:48}}>
-          {pool.length>0?pool.map(b=>(
-            <div key={b}
-              onClick={()=>{if(dragging)return;const emptyIdx=guess.indexOf(null);if(emptyIdx>=0)placeInSlot(emptyIdx,b);}}
-              onTouchStart={onTouchStart(b,null)}
-              style={{width:52,height:52,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
-                background:"rgba(255,255,255,.06)",border:"2px solid rgba(255,255,255,.1)",
-                cursor:"grab",transition:"all .12s",opacity:isDraggingBuddy(b)?.3:1}}>
-              <span style={{fontSize:28}}>{b}</span>
-            </div>
-          )):<div style={{fontSize:12,opacity:.25,padding:"12px 0"}}>All buddies placed on platform</div>}
+        <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>STARTING AREA</div>
+        <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+          {poolSlots.map((b,i)=>{
+            const isHover=hoverPool===i;
+            const isDrag=isDraggingFrom("pool",i);
+            return(<div key={"s"+i} ref={el=>poolRefs.current[i]=el}
+              onTouchStart={b?onTouchStart(b,"pool",i):undefined}
+              style={{width:52,height:56,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
+                background:isHover?"rgba(255,255,255,.1)":b?"rgba(255,255,255,.06)":"transparent",
+                border:isHover?"2px solid rgba(255,255,255,.3)":b?"2px solid rgba(255,255,255,.1)":"2px solid transparent",
+                borderBottom:isHover?"2px solid rgba(255,255,255,.3)":b?"2px solid rgba(255,255,255,.1)":"2px solid rgba(255,255,255,.15)",
+                cursor:b?"grab":"default",transition:"border .1s, background .1s",
+                opacity:isDrag?.25:1}}>
+              {b&&!isDrag?<span style={{fontSize:28}}>{b}</span>:null}
+            </div>);
+          })}
         </div>
       </div>
 
@@ -1484,7 +1506,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       </div>
 
       {/* Floating drag ghost */}
-      {dragging&&<div style={{position:"fixed",left:dragging.x-28,top:dragging.y-28,width:56,height:56,
+      {dragging&&dragging.isDrag&&<div style={{position:"fixed",left:dragging.x-28,top:dragging.y-28,width:56,height:56,
         borderRadius:14,background:"rgba(167,139,250,.3)",border:"2px solid rgba(167,139,250,.6)",
         display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:9999,
         boxShadow:"0 8px 24px rgba(0,0,0,.4)",transform:"scale(1.1)"}}>
