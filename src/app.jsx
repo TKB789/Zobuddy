@@ -1338,15 +1338,16 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
         n[slotIdx]=buddy;
         return n;
       });
-      setLastResult(null); // clear result when rearranging
-    };
-
-    const removeFromSlot=(slotIdx)=>{
-      setGuess(prev=>{const n=[...prev];n[slotIdx]=null;return n;});
+      setPool(prev=>prev.filter(b=>b!==buddy));
       setLastResult(null);
     };
 
-    const availableBuddies=pool.filter(b=>!guess.includes(b));
+    const removeFromSlot=(slotIdx)=>{
+      const buddy=guess[slotIdx];
+      setGuess(prev=>{const n=[...prev];n[slotIdx]=null;return n;});
+      if(buddy)setPool(prev=>[...prev,buddy]);
+      setLastResult(null);
+    };
 
     if(!answer)return null;
 
@@ -1399,7 +1400,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:"12px 8px",marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>TAP TO PLACE</div>
         <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",minHeight:48}}>
-          {availableBuddies.length>0?availableBuddies.map(b=>(
+          {pool.length>0?pool.map(b=>(
             <div key={b} onClick={()=>{
               const emptyIdx=guess.indexOf(null);
               if(emptyIdx>=0){placeInSlot(emptyIdx,b);}
