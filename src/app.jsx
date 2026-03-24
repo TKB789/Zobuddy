@@ -1570,11 +1570,16 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       </div>
 
       {/* Progress bar */}
-      <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.06)",marginBottom:10,flexShrink:0}}>
+      <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.06)",marginBottom:6,flexShrink:0}}>
         <div style={{height:"100%",borderRadius:2,background:"linear-gradient(90deg,#667eea,#764ba2)",width:`${((step+1)/TOTAL_ROUNDS)*100}%`,transition:"width .3s"}}/>
       </div>
 
-      {/* 3x3 Grid - fixed position */}
+      {/* Hint area - always reserved */}
+      <div style={{height:20,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        {step<nLevel&&<span style={{fontSize:12,opacity:.25}}>Remember this — matching starts in {nLevel-step} step{nLevel-step>1?"s":""}</span>}
+      </div>
+
+      {/* 3x3 Grid - fixed in center */}
       <div style={{display:"flex",justifyContent:"center",alignItems:"center",flex:1}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,width:"min(70vw,240px)",aspectRatio:"1"}}>
           {Array.from({length:9},(_,i)=>{
@@ -1589,14 +1594,14 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
         </div>
       </div>
 
-      {/* Feedback flash - fixed height so grid doesn't shift */}
-      <div style={{height:32,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-        {feedbackMsg&&<div style={{fontSize:20,fontWeight:900,
-          color:feedbackMsg==="✓"?"#43e97b":feedbackMsg==="½"?"#feca57":"#f5576c"}}>{feedbackMsg}</div>}
+      {/* Feedback - always reserved */}
+      <div style={{height:28,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        {feedbackMsg&&<span style={{fontSize:20,fontWeight:900,
+          color:feedbackMsg==="✓"?"#43e97b":feedbackMsg==="½"?"#feca57":"#f5576c"}}>{feedbackMsg}</span>}
       </div>
 
-      {/* Response buttons - thumb-friendly at bottom */}
-      <div style={{display:"flex",gap:12,padding:"12px 8px 16px",flexShrink:0,justifyContent:"center"}}>
+      {/* Response buttons - thumb-friendly at bottom, always same size */}
+      <div style={{display:"flex",gap:12,padding:"8px 8px 16px",flexShrink:0,justifyContent:"center"}}>
         <button onClick={()=>{if(canRespond)setPosMatch(p=>!p);}}
           style={{flex:1,maxWidth:160,padding:"16px 8px",borderRadius:14,fontSize:15,fontWeight:800,cursor:canRespond?"pointer":"default",
             background:posMatch?"rgba(96,165,250,.25)":"rgba(255,255,255,.04)",
@@ -1616,7 +1621,6 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
           🔤 Letter<br/><span style={{fontSize:11,fontWeight:600,opacity:.6}}>Match</span>
         </button>
       </div>
-      {step<nLevel&&<div style={{textAlign:"center",fontSize:12,opacity:.25,paddingBottom:8,flexShrink:0}}>Remember this — matching starts in {nLevel-step} step{nLevel-step>1?"s":""}</div>}
     </div>);
   };
 
