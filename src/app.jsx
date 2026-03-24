@@ -1303,21 +1303,21 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     const[pool,setPool]=useState([]);
     const[best,setBest]=useState(()=>{try{return Number(localStorage.getItem("zo_best_lineup"))||0;}catch{return 0;}});
     const[attempts,setAttempts]=useState(0);
-    const[lastResult,setLastResult]=useState(null); // number of correct, or null if not checked yet
+    const[lastResult,setLastResult]=useState(null);
+    const[dragging,setDragging]=useState(null); // {buddy, fromSlot:number|null, x, y}
+    const slotRefs=React.useRef([]);
+    const dragRef=React.useRef(null);
 
     const initGame=()=>{
       const shuffled=[...BUDDIES].sort(()=>Math.random()-.5);
       const picked=shuffled.slice(0,5);
       setAnswer(picked);
-      // Shuffle pool until it doesn't match the answer order
       let poolOrder=[...picked];
       do{poolOrder=[...picked].sort(()=>Math.random()-.5);}
       while(poolOrder.every((b,i)=>b===picked[i]));
       setPool(poolOrder);
       setGuess([null,null,null,null,null]);
-      setWon(false);
-      setAttempts(0);
-      setLastResult(null);
+      setWon(false);setAttempts(0);setLastResult(null);setDragging(null);
     };
     useEffect(()=>{initGame();},[]);
 
@@ -1326,8 +1326,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       let correct=0;
       for(let i=0;i<5;i++)if(guess[i]===answer[i])correct++;
       const newAttempts=attempts+1;
-      setAttempts(newAttempts);
-      setLastResult(correct);
+      setAttempts(newAttempts);setLastResult(correct);
       if(correct===5){
         setWon(true);
         if(best===0||newAttempts<best){setBest(newAttempts);try{localStorage.setItem("zo_best_lineup",String(newAttempts));}catch{}}
@@ -1335,22 +1334,74 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     };
 
     const placeInSlot=(slotIdx,buddy)=>{
-      setGuess(prev=>{
-        const n=[...prev];
-        const existingIdx=n.indexOf(buddy);
-        if(existingIdx>=0)n[existingIdx]=null;
-        n[slotIdx]=buddy;
-        return n;
-      });
+      setGuess(prev=>{const n=[...prev];const ex=n.indexOf(buddy);if(ex>=0)n[ex]=null;n[slotIdx]=buddy;return n;});
       setPool(prev=>prev.filter(b=>b!==buddy));
       setLastResult(null);
     };
-
     const removeFromSlot=(slotIdx)=>{
       const buddy=guess[slotIdx];
       setGuess(prev=>{const n=[...prev];n[slotIdx]=null;return n;});
       if(buddy)setPool(prev=>[...prev,buddy]);
       setLastResult(null);
+    };
+
+    // Find which slot a point is over
+    const findSlotAt=(x,y)=>{
+      for(let i=0;i<5;i++){
+        const el=slotRefs.current[i];if(!el)continue;
+        const r=el.getBoundingClientRect();
+        if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return i;
+      }
+      return-1;
+    };
+
+    // Drag handlers
+    const startDrag=(buddy,fromSlot,x,y)=>{
+      dragRef.current={buddy,fromSlot};
+      setDragging({buddy,fromSlot,x,y});
+    };
+    const moveDrag=(x,y)=>{
+      if(!dragRef.current)return;
+      setDragging(prev=>prev?{...prev,x,y}:null);
+    };
+    const endDrag=(x,y)=>{
+      if(!dragRef.current)return;
+      const{buddy,fromSlot}=dragRef.current;
+      const targetSlot=findSlotAt(x,y);
+      if(targetSlot>=0){
+        // Dropping on a platform slot
+        if(fromSlot!==null){
+          // Moving from one slot to another — swap
+          setGuess(prev=>{
+            const n=[...prev];
+            const swapBuddy=n[targetSlot];
+            n[fromSlot]=swapBuddy;n[targetSlot]=buddy;
+            return n;
+          });
+        } else {
+          placeInSlot(targetSlot,buddy);
+        }
+        setLastResult(null);
+      } else if(fromSlot!==null){
+        // Dragged from platform but not onto a slot — return to pool
+        removeFromSlot(fromSlot);
+      }
+      dragRef.current=null;setDragging(null);
+    };
+
+    const onTouchStart=(buddy,fromSlot)=>(e)=>{
+      e.preventDefault();
+      const t=e.touches[0];
+      startDrag(buddy,fromSlot,t.clientX,t.clientY);
+    };
+    const onTouchMove=(e)=>{
+      if(!dragRef.current)return;
+      e.preventDefault();
+      const t=e.touches[0];moveDrag(t.clientX,t.clientY);
+    };
+    const onTouchEnd=(e)=>{
+      if(!dragRef.current)return;
+      const t=e.changedTouches[0];endDrag(t.clientX,t.clientY);
     };
 
     if(!answer)return null;
@@ -1368,10 +1419,13 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       </div>
     </div>);
 
-    return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 16px",overflow:"auto"}}>
+    const isDraggingBuddy=(b)=>dragging&&dragging.buddy===b;
+
+    return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 16px",overflow:"auto",touchAction:"none",userSelect:"none",WebkitUserSelect:"none"}}
+      onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
       <div style={{textAlign:"center",marginBottom:10}}>
         <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0"}}>🔮 Guess the Secret Lineup</div>
-        <div style={{fontSize:12,opacity:.35,marginTop:3}}>Place all 5 buddies, then check. Tap a placed buddy to move it back.</div>
+        <div style={{fontSize:12,opacity:.35,marginTop:3}}>Drag or tap buddies into position</div>
         <div style={{fontSize:12,opacity:.3,marginTop:2}}>Checks: {attempts}{best>0?` · Best: ${best}`:""}</div>
       </div>
 
@@ -1388,30 +1442,33 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       <div style={{background:"rgba(167,139,250,.06)",border:"1px solid rgba(167,139,250,.15)",borderRadius:14,padding:"12px 8px",marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>LINEUP PLATFORM</div>
         <div style={{display:"flex",gap:6,justifyContent:"center"}}>
-          {guess.map((b,i)=>(
-            <div key={i} onClick={()=>{if(b)removeFromSlot(i);}}
+          {guess.map((b,i)=>{
+            const isOver=dragging&&findSlotAt(dragging.x,dragging.y)===i;
+            return(<div key={i} ref={el=>slotRefs.current[i]=el}
+              onClick={()=>{if(b&&!dragging)removeFromSlot(i);}}
+              onTouchStart={b?onTouchStart(b,i):undefined}
               style={{width:56,height:64,borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-                background:b?"rgba(167,139,250,.15)":"rgba(255,255,255,.03)",
-                border:b?"2px solid rgba(167,139,250,.4)":"2px dashed rgba(255,255,255,.1)",
-                cursor:b?"pointer":"default",transition:"all .15s",position:"relative"}}>
-              {b?<span style={{fontSize:30}}>{b}</span>:<span style={{fontSize:16,opacity:.15}}>{i+1}</span>}
-            </div>
-          ))}
+                background:isOver?"rgba(167,139,250,.25)":b?"rgba(167,139,250,.15)":"rgba(255,255,255,.03)",
+                border:isOver?"2px solid rgba(167,139,250,.7)":b?"2px solid rgba(167,139,250,.4)":"2px dashed rgba(255,255,255,.1)",
+                cursor:b?"grab":"default",transition:"border .1s, background .1s",
+                opacity:b&&isDraggingBuddy(b)?.3:1}}>
+              {b&&!isDraggingBuddy(b)?<span style={{fontSize:30}}>{b}</span>:!b?<span style={{fontSize:16,opacity:.15}}>{i+1}</span>:null}
+            </div>);
+          })}
         </div>
       </div>
 
       {/* Starting area */}
       <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:"12px 8px",marginBottom:12}}>
-        <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>TAP TO PLACE</div>
+        <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>DRAG OR TAP TO PLACE</div>
         <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",minHeight:48}}>
           {pool.length>0?pool.map(b=>(
-            <div key={b} onClick={()=>{
-              const emptyIdx=guess.indexOf(null);
-              if(emptyIdx>=0){placeInSlot(emptyIdx,b);}
-            }}
+            <div key={b}
+              onClick={()=>{if(dragging)return;const emptyIdx=guess.indexOf(null);if(emptyIdx>=0)placeInSlot(emptyIdx,b);}}
+              onTouchStart={onTouchStart(b,null)}
               style={{width:52,height:52,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
                 background:"rgba(255,255,255,.06)",border:"2px solid rgba(255,255,255,.1)",
-                cursor:"pointer",transition:"all .12s"}}>
+                cursor:"grab",transition:"all .12s",opacity:isDraggingBuddy(b)?.3:1}}>
               <span style={{fontSize:28}}>{b}</span>
             </div>
           )):<div style={{fontSize:12,opacity:.25,padding:"12px 0"}}>All buddies placed on platform</div>}
@@ -1425,6 +1482,14 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
             color:guess.some(g=>g===null)?"#555":"#fff",border:"none",borderRadius:12,padding:"12px 32px",fontSize:16,fontWeight:800,cursor:guess.some(g=>g===null)?"default":"pointer"}}>
           {lastResult!==null?"Check Again":"Check Lineup"}</button>
       </div>
+
+      {/* Floating drag ghost */}
+      {dragging&&<div style={{position:"fixed",left:dragging.x-28,top:dragging.y-28,width:56,height:56,
+        borderRadius:14,background:"rgba(167,139,250,.3)",border:"2px solid rgba(167,139,250,.6)",
+        display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:9999,
+        boxShadow:"0 8px 24px rgba(0,0,0,.4)",transform:"scale(1.1)"}}>
+        <span style={{fontSize:30}}>{dragging.buddy}</span>
+      </div>}
     </div>);
   };
 
