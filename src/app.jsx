@@ -1219,7 +1219,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     const ROWS=10,COLS=8,MINES=10;
     const[board,setBoard]=useState(null);const[revealed,setRevealed]=useState(null);const[flagged,setFlagged]=useState(null);
     const[gameOver,setGameOver]=useState(false);const[won,setWon]=useState(false);const[flagMode,setFlagMode]=useState(false);
-    const[best,setBest]=useState(()=>{try{return Number(localStorage.getItem("zo_best_mines"))||0;}catch{return 0;}});
+    const[best,setBest]=useState(()=>{try{return Number(localStorage.getItem("zo_best_mines","zo_best_lineup"))||0;}catch{return 0;}});
     const[startTime,setStartTime]=useState(null);const[elapsed,setElapsed]=useState(0);
     const initBoard=()=>{const b=Array(ROWS).fill(null).map(()=>Array(COLS).fill(0));let placed=0;
       while(placed<MINES){const r=Math.floor(Math.random()*ROWS),c=Math.floor(Math.random()*COLS);if(b[r][c]!==-1){b[r][c]=-1;placed++;}}
@@ -1252,7 +1252,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       while(stack.length){const[cr,cc]=stack.pop();if(cr<0||cr>=ROWS||cc<0||cc>=COLS||rv[cr][cc]||flagged[cr][cc])continue;
         rv[cr][cc]=true;if(board[cr][cc]===0){for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)stack.push([cr+dr,cc+dc]);}}
       setRevealed(rv);let unrevealed=0;for(let i=0;i<ROWS;i++)for(let j=0;j<COLS;j++)if(!rv[i][j])unrevealed++;
-      if(unrevealed===MINES){setWon(true);if(best===0||elapsed<best){setBest(elapsed);try{localStorage.setItem("zo_best_mines",String(elapsed));}catch{}}}};
+      if(unrevealed===MINES){setWon(true);if(best===0||elapsed<best){setBest(elapsed);try{localStorage.setItem("zo_best_mines","zo_best_lineup",String(elapsed));}catch{}}}};
     const toggleFlag=(r,c)=>{if(!board||gameOver||won||revealed[r][c])return;setFlagged(prev=>{const n=prev.map(r=>[...r]);n[r][c]=!n[r][c];return n;});};
     const handleCell=(r,c)=>{if(flagMode)toggleFlag(r,c);else reveal(r,c);};
     const flagCount=flagged?flagged.flat().filter(Boolean).length:0;
@@ -1294,6 +1294,154 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     </div>);
   };
 
+  // ═══ ZOBUDDY LINEUP (position matching puzzle) ═══
+  const Lineup=()=>{
+    const BUDDIES=["🐭","🐮","🐯","🐰","🐲","🐍","🐴","🐐","🐵","🐔","🐶","🐷"];
+    const[answer,setAnswer]=useState(null);
+    const[guess,setGuess]=useState([null,null,null,null,null]);
+    const[history,setHistory]=useState([]);
+    const[won,setWon]=useState(false);
+    const[pool,setPool]=useState([]);
+    const[dragIdx,setDragIdx]=useState(null);
+    const[best,setBest]=useState(()=>{try{return Number(localStorage.getItem("zo_best_lineup"))||0;}catch{return 0;}});
+
+    const initGame=()=>{
+      const shuffled=[...BUDDIES].sort(()=>Math.random()-.5);
+      const picked=shuffled.slice(0,5);
+      setAnswer(picked);
+      setPool([...picked].sort(()=>Math.random()-.5));
+      setGuess([null,null,null,null,null]);
+      setHistory([]);
+      setWon(false);
+    };
+    useEffect(()=>{initGame();},[]);
+
+    const checkGuess=()=>{
+      if(guess.some(g=>g===null))return;
+      let correct=0;
+      for(let i=0;i<5;i++)if(guess[i]===answer[i])correct++;
+      const entry={guess:[...guess],correct};
+      const newHistory=[...history,entry];
+      setHistory(newHistory);
+      if(correct===5){
+        setWon(true);
+        const attempts=newHistory.length;
+        if(best===0||attempts<best){setBest(attempts);try{localStorage.setItem("zo_best_lineup",String(attempts));}catch{}}
+      } else {
+        setGuess([null,null,null,null,null]);
+      }
+    };
+
+    const placeInSlot=(slotIdx,buddy)=>{
+      setGuess(prev=>{
+        const n=[...prev];
+        // Remove buddy from any existing slot
+        const existingIdx=n.indexOf(buddy);
+        if(existingIdx>=0)n[existingIdx]=null;
+        // If slot already has a buddy, swap or clear
+        n[slotIdx]=buddy;
+        return n;
+      });
+    };
+
+    const removeFromSlot=(slotIdx)=>{
+      setGuess(prev=>{const n=[...prev];n[slotIdx]=null;return n;});
+    };
+
+    const availableBuddies=pool.filter(b=>!guess.includes(b));
+    const attempts=history.length;
+
+    if(!answer)return null;
+
+    if(won)return(<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{fontSize:48,marginBottom:10}}>🎉</div>
+      <div style={{fontSize:22,fontWeight:900,color:"#e8e0f0"}}>You Got It!</div>
+      <div style={{display:"flex",gap:8,marginTop:12,marginBottom:8}}>{answer.map((b,i)=><span key={i} style={{fontSize:36}}>{b}</span>)}</div>
+      <div style={{fontSize:18,fontWeight:800,color:"#feca57",marginTop:4}}>Solved in {attempts} {attempts===1?"guess":"guesses"}</div>
+      {(best===0||attempts<=best)&&<div style={{fontSize:14,color:"#43e97b",fontWeight:700,marginTop:4}}>🏆 New Best!</div>}
+      {best>0&&attempts>best&&<div style={{fontSize:12,opacity:.5,marginTop:2}}>Best: {best} guesses</div>}
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        <button onClick={()=>{setGameKey(k=>k+1);}} style={{background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",borderRadius:12,padding:"10px 24px",fontSize:15,fontWeight:700,cursor:"pointer"}}>Play Again</button>
+        <button onClick={()=>setGame(null)} style={{background:"rgba(255,255,255,.08)",color:"#ccc",border:"1px solid rgba(255,255,255,.1)",borderRadius:12,padding:"10px 20px",fontSize:15,fontWeight:700,cursor:"pointer"}}>Exit to Menu</button>
+      </div>
+    </div>);
+
+    return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 16px",overflow:"auto"}}>
+      <div style={{textAlign:"center",marginBottom:8}}>
+        <div style={{fontSize:13,opacity:.4}}>Guess the secret lineup! Tap a buddy, then tap a slot.</div>
+        <div style={{fontSize:12,opacity:.3,marginTop:2}}>Attempt {attempts+1}{best>0?` · Best: ${best}`:""}</div>
+      </div>
+
+      {/* Lineup slots */}
+      <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:12}}>
+        {guess.map((b,i)=>(
+          <div key={i} onClick={()=>{if(b)removeFromSlot(i);else if(dragIdx!==null){placeInSlot(i,dragIdx);setDragIdx(null);}}}
+            style={{width:56,height:64,borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+              background:b?"rgba(102,126,234,.15)":"rgba(255,255,255,.04)",
+              border:b?"2px solid rgba(102,126,234,.4)":dragIdx!==null?"2px dashed rgba(102,126,234,.4)":"2px solid rgba(255,255,255,.08)",
+              cursor:"pointer",transition:"all .15s"}}>
+            {b?<span style={{fontSize:30}}>{b}</span>:<span style={{fontSize:14,opacity:.2}}>{i+1}</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Available buddies to pick from */}
+      <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:12,flexWrap:"wrap"}}>
+        {availableBuddies.map(b=>(
+          <div key={b} onClick={()=>{
+            if(dragIdx===b){setDragIdx(null);return;}
+            setDragIdx(b);
+            // Auto-place in first empty slot
+            const emptyIdx=guess.indexOf(null);
+            if(emptyIdx>=0){placeInSlot(emptyIdx,b);setDragIdx(null);}
+          }}
+            style={{width:48,height:48,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
+              background:dragIdx===b?"rgba(254,202,87,.2)":"rgba(255,255,255,.06)",
+              border:dragIdx===b?"2px solid rgba(254,202,87,.5)":"2px solid rgba(255,255,255,.08)",
+              cursor:"pointer",transition:"all .12s"}}>
+            <span style={{fontSize:26}}>{b}</span>
+          </div>
+        ))}
+        {availableBuddies.length===0&&<div style={{fontSize:12,opacity:.3}}>All placed!</div>}
+      </div>
+
+      {/* Submit button */}
+      <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
+        <button onClick={checkGuess} disabled={guess.some(g=>g===null)}
+          style={{background:guess.some(g=>g===null)?"rgba(255,255,255,.04)":"linear-gradient(135deg,#667eea,#764ba2)",
+            color:guess.some(g=>g===null)?"#555":"#fff",border:"none",borderRadius:12,padding:"10px 28px",fontSize:15,fontWeight:700,cursor:guess.some(g=>g===null)?"default":"pointer"}}>Check Lineup</button>
+        <button onClick={()=>setGuess([null,null,null,null,null])}
+          style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"10px 16px",fontSize:14,fontWeight:700,color:"#888",cursor:"pointer"}}>Clear</button>
+      </div>
+
+      {/* History */}
+      {history.length>0&&<div style={{fontSize:13,fontWeight:800,opacity:.4,marginBottom:6}}>PREVIOUS GUESSES</div>}
+      <div style={{flex:1,overflowY:"auto"}}>
+        {[...history].reverse().map((h,hi)=>{
+          const attemptNum=history.length-hi;
+          return(<div key={hi} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:4,borderRadius:10,
+            background:h.correct===5?"rgba(67,233,123,.1)":"rgba(255,255,255,.03)",border:h.correct===5?"1px solid rgba(67,233,123,.2)":"1px solid rgba(255,255,255,.06)"}}>
+            <span style={{fontSize:11,fontWeight:800,color:"rgba(102,126,234,.5)",minWidth:20}}>#{attemptNum}</span>
+            <div style={{display:"flex",gap:4,flex:1}}>
+              {h.guess.map((b,i)=>{
+                const isCorrect=b===answer[i];
+                return(<div key={i} style={{width:36,height:36,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",
+                  background:isCorrect?"rgba(67,233,123,.15)":"rgba(255,255,255,.04)",
+                  border:isCorrect?"1px solid rgba(67,233,123,.3)":"1px solid rgba(255,255,255,.06)"}}>
+                  <span style={{fontSize:20}}>{b}</span>
+                </div>);
+              })}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <span style={{fontSize:14,fontWeight:800,color:h.correct>=4?"#43e97b":h.correct>=2?"#feca57":"#f5576c"}}>{h.correct}</span>
+              <span style={{fontSize:11,opacity:.4}}>/ 5</span>
+            </div>
+          </div>);
+        })}
+      </div>
+    </div>);
+  };
+
   // ═══ GAME MENU ═══
   if(!game)return(
     <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column"}} onClick={onClose}>
@@ -1308,7 +1456,8 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
             {id:"bubbles",icon:"🥦",name:"Veggie Garden",desc:"Harvest veggies fast! Avoid mushrooms & poison.",color:"#43e97b",best:"zo_best_bubbles"},
             {id:"breakout",icon:"🍎",name:"Fruit Blocks",desc:"Break up the frozen fruits for a yummy dessert! 🍧",color:"#f5576c",best:"zo_best_breakout"},
             {id:"rhythm",icon:"💕",name:"Memory Matchmaker",desc:"Flip cards and pair up the animals!",color:"#feca57",best:"zo_best_memory",bestLabel:" moves"},
-            {id:"mines",icon:"🍀",name:"Lucky Clovers",desc:"Pick clovers without finding a bomb!",color:"#43e97b",best:"zo_best_mines",bestLabel:"s"},
+            {id:"mines",icon:"🍀",name:"Lucky Clovers",desc:"Pick clovers without finding a bomb!",color:"#43e97b",best:"zo_best_mines","zo_best_lineup",bestLabel:"s"},
+            {id:"lineup",icon:"🔮",name:"Zobuddy Lineup",desc:"Guess the secret lineup from clues!",color:"#a78bfa",best:"zo_best_lineup",bestLabel:" guesses"},
           ].map(g=>{
             const b=(()=>{try{return Number(localStorage.getItem(g.best))||0;}catch{return 0;}})();
             return(<div key={g.id} onClick={()=>setGame(g.id)}
@@ -1325,11 +1474,11 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     <div style={{position:"fixed",inset:0,zIndex:1000,background:"#0a0a1a",display:"flex",flexDirection:"column"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",flexShrink:0}}>
         <button onClick={()=>setGame(null)} style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,padding:"5px 12px",color:"#ccc",fontSize:13,cursor:"pointer",fontWeight:700}}>← Exit to Menu</button>
-        <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0"}}>{({bubbles:"🥦 Veggie Garden",breakout:"🍎 Fruit Blocks",rhythm:"💕 Memory Matchmaker",mines:"🍀 Lucky Clovers"})[game]||""}</div>
+        <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0"}}>{({bubbles:"🥦 Veggie Garden",breakout:"🍎 Fruit Blocks",rhythm:"💕 Memory Matchmaker",mines:"🍀 Lucky Clovers",lineup:"🔮 Zobuddy Lineup"})[game]||""}</div>
         <button onClick={onClose} style={{background:"rgba(255,255,255,.08)",border:"none",borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",fontSize:13}}>✕</button>
       </div>
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {game==="bubbles"&&<BubblePop key={gameKey}/>}{game==="breakout"&&<Breakout key={gameKey}/>}{game==="rhythm"&&<MemoryMatch key={gameKey}/>}{game==="mines"&&<Minesweeper key={gameKey}/>}
+        {game==="bubbles"&&<BubblePop key={gameKey}/>}{game==="breakout"&&<Breakout key={gameKey}/>}{game==="rhythm"&&<MemoryMatch key={gameKey}/>}{game==="mines"&&<Minesweeper key={gameKey}/>}{game==="lineup"&&<Lineup key={gameKey}/>}
       </div></div>);
 };
 const DAILY_GREETINGS=[
@@ -2578,7 +2727,7 @@ function DayPlanner({plannerData,plannerViewDate,setPlannerViewDate,MOODS,getPla
   // Backup: export all app data as JSON
   const exportBackup=()=>{
     const backup={_zobuddy_backup:true,_version:14,_date:new Date().toISOString()};
-    const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines"];
+    const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
     keys.forEach(k=>{try{const v=localStorage.getItem(k);if(v)backup[k]=JSON.parse(v);}catch{try{backup[k]=localStorage.getItem(k);}catch{}}});
     const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");
@@ -2591,7 +2740,7 @@ function DayPlanner({plannerData,plannerViewDate,setPlannerViewDate,MOODS,getPla
       if(!data?._zobuddy_backup){setRestoreError("Not a valid Zobuddy backup file.");return;}
       const keyMap={"app":"zodibuddies_v1","planner":"zodibuddy_planner_v1","clean":"zodibuddy_clean_v1","workout":"zodibuddy_workout_v1","budget":"zodibuddy_budget_v1","journal":"zodibuddy_journal_v1"};
       Object.entries(keyMap).forEach(([field,key])=>{if(data[field])localStorage.setItem(key,JSON.stringify(data[field]));});
-      const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines"];
+      const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
       allKeys.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,typeof data[k]==="string"?data[k]:JSON.stringify(data[k]));});
       setRestoreSuccess(true);
       setTimeout(()=>window.location.reload(),1500);
@@ -4521,7 +4670,7 @@ function SpiritAnimals(){
           <div style={{display:"flex",gap:6}}>
             <button onClick={()=>{
               const backup={_zobuddy_backup:true,_version:14,_date:new Date().toISOString()};
-              const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines"];
+              const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
               keys.forEach(k=>{try{const v=localStorage.getItem(k);if(v)backup[k]=JSON.parse(v);}catch{try{backup[k]=localStorage.getItem(k);}catch{}}});
               const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
               const url=URL.createObjectURL(blob);const a=document.createElement("a");
@@ -4537,7 +4686,7 @@ function SpiritAnimals(){
                   // Old format: named fields
                   Object.entries(keyMap).forEach(([field,key])=>{if(data[field])localStorage.setItem(key,JSON.stringify(data[field]));});
                   // New format: direct localStorage keys
-                  const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines"];
+                  const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
                   allKeys.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,typeof data[k]==="string"?data[k]:JSON.stringify(data[k]));});
                   alert("✅ Restored! Reloading...");setTimeout(()=>window.location.reload(),500);
                 }catch{alert("Invalid backup file.");}};reader.readAsText(file);};input.click();
