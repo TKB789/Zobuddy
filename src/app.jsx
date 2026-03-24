@@ -1890,13 +1890,14 @@ const NotebookPanel=()=>{
       </div>
       <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0,flexWrap:"wrap"}}>
         <button onClick={()=>setPixelEraser(e=>!e)} style={btn(pixelEraser?{background:"rgba(245,87,108,.2)",color:"#f5576c"}:{color:"#ccc"})}>
+        <button onClick={()=>setPixelEraser(e=>!e)} style={btn(pixelEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",boxShadow:"0 0 8px rgba(245,87,108,.3)"}:{color:"#ccc"})}>
           <span style={{display:"inline-block",transform:pixelEraser?"rotate(180deg)":"none",transition:"transform .2s"}}>✏️</span></button>
         <div style={{width:1,height:20,background:"rgba(255,255,255,.1)",margin:"0 2px"}}/>
         <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 8px"})}>−</button>
         <span style={{fontSize:11,opacity:.4,minWidth:32,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
         <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={btn({padding:"4px 8px"})}>+</button>
         <div style={{width:1,height:20,background:"rgba(255,255,255,.1)",margin:"0 2px"}}/>
-        {!pixelEraser&&PIXEL_COLORS.map(c=>(<div key={c} onClick={()=>setPixelColor(c)} style={{width:24,height:24,borderRadius:5,background:c,border:pixelColor===c?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer"}}/>))}
+        {PIXEL_COLORS.map(c=>(<div key={c} onClick={()=>{setPixelColor(c);setPixelEraser(false);}} style={{width:24,height:24,borderRadius:5,background:c,border:pixelColor===c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",opacity:pixelEraser?.4:1,transition:"opacity .15s"}}/>))}
         <button onClick={()=>{if(!confirm("Clear all?"))return;const d=readNb();if(d.pages?.[nbPageIdx]){d.pages[nbPageIdx].pixels={};writeNb(d);drawPixelGrid();}}}
           style={btn({background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:11,padding:"4px 10px"})}>Clear</button>
       </div>
@@ -1923,26 +1924,26 @@ const NotebookPanel=()=>{
           :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
           <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
-        <button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"🎨":"🎨"}</button>
+        <button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"🔡":"🎨"}</button>
         <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>
       </div>
       {pageDrawMode&&<div style={{display:"flex",flexDirection:"column",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:5}}>
-          <button onClick={()=>setDrawEraser(e=>!e)} style={btn(drawEraser?{background:"rgba(245,87,108,.2)",color:"#f5576c"}:{color:"#ccc"})}>
+          <button onClick={()=>setDrawEraser(e=>!e)} style={btn(drawEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",boxShadow:"0 0 8px rgba(245,87,108,.3)"}:{color:"#ccc"})}>
             <span style={{display:"inline-block",transform:drawEraser?"rotate(180deg)":"none",transition:"transform .2s"}}>✏️</span></button>
-          {!drawEraser&&["#fff","#f5576c","#feca57","#43e97b","#60a5fa","#f093fb","#fb923c"].map(c=>(
-            <div key={c} onClick={()=>setDrawColor(c)} style={{width:24,height:24,borderRadius:6,background:c,border:drawColor===c?"2px solid #fff":"2px solid rgba(255,255,255,.1)",cursor:"pointer"}}/>))}
+          {["#fff","#f5576c","#feca57","#43e97b","#60a5fa","#f093fb","#fb923c"].map(c=>(
+            <div key={c} onClick={()=>{setDrawColor(c);setDrawEraser(false);}} style={{width:24,height:24,borderRadius:6,background:c,border:drawColor===c&&!drawEraser?"2px solid #fff":"2px solid rgba(255,255,255,.1)",cursor:"pointer",opacity:drawEraser?.4:1,transition:"opacity .15s"}}/>))}
           <div style={{flex:1}}/>
           <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 6px",fontSize:14})}>−</button>
           <span style={{fontSize:10,opacity:.4,minWidth:28,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
           <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 6px",fontSize:14})}>+</button>
         </div>
-        {!drawEraser&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-          {[1,2,3,4,6,8,10,12].map(s=>(<div key={s} onClick={()=>setDrawSize(s)}
+        <div style={{display:"flex",alignItems:"center",gap:4,opacity:drawEraser?.35:1,transition:"opacity .15s"}}>
+          {[1,2,3,4,6,8,10,12].map(s=>(<div key={s} onClick={()=>{setDrawSize(s);setDrawEraser(false);}}
             style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,
               background:drawSize===s?"rgba(255,255,255,.12)":"transparent",border:drawSize===s?`1px solid ${drawColor}`:"1px solid transparent",cursor:"pointer"}}>
             <div style={{width:Math.max(s,2),height:Math.max(s,2),borderRadius:"50%",background:drawColor}}/></div>))}
-        </div>}
+        </div>
       </div>}
       {!pageDrawMode&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
         <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 8px"})}>−</button>
