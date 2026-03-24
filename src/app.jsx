@@ -1720,11 +1720,21 @@ const NotebookPanel=()=>{
   const getDrawData=()=>{
     const d=readNb();return d.pages?.[pageIdxRef.current]?.drawData||null;
   };
+  const drawUndoStack=React.useRef([]); // ImageData snapshots
+  const drawRedoStack=React.useRef([]);
+  const pushDrawUndo=()=>{const c=drawCanvasRef.current;if(!c)return;try{const ctx=c.getContext("2d");drawUndoStack.current.push(ctx.getImageData(0,0,c.width,c.height));if(drawUndoStack.current.length>30)drawUndoStack.current.shift();drawRedoStack.current=[];}catch{}};
+  const undoDraw=()=>{const c=drawCanvasRef.current;if(!c||!drawUndoStack.current.length)return;const ctx=c.getContext("2d");
+    drawRedoStack.current.push(ctx.getImageData(0,0,c.width,c.height));
+    const prev=drawUndoStack.current.pop();ctx.putImageData(prev,0,0);saveCanvas();};
+  const redoDraw=()=>{const c=drawCanvasRef.current;if(!c||!drawRedoStack.current.length)return;const ctx=c.getContext("2d");
+    drawUndoStack.current.push(ctx.getImageData(0,0,c.width,c.height));
+    const next=drawRedoStack.current.pop();ctx.putImageData(next,0,0);saveCanvas();};
   const loadCanvas=()=>{const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
-    ctx.clearRect(0,0,c.width,c.height);drawImgRef.current=null;
+    ctx.clearRect(0,0,c.width,c.height);drawImgRef.current=null;drawUndoStack.current=[];drawRedoStack.current=[];
     const d=readNb();const src=d.pages?.[pageIdxRef.current]?.drawData||null;
     if(src){drawImgRef.current=src;const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=src;}};
   const onDown=React.useCallback((e)=>{if(e.touches&&e.touches.length>1)return;e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
+    pushDrawUndo();
     const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;const t=e.touches?e.touches[0]:e;
     const x=(t.clientX-r.left)*sx,y=(t.clientY-r.top)*sy;
     if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
@@ -1746,7 +1756,7 @@ const NotebookPanel=()=>{
     setTimeout(loadCanvas,50);}},[nbPageIdx,pageDrawMode]);
 
   // ─── PIXEL ART ──────────────────────────────────────────────────
-  const pixCanvasRef=React.useRef(null);const pixIsPainting=React.useRef(false);const pixelUndoRef=React.useRef([]);
+  const pixCanvasRef=React.useRef(null);const pixIsPainting=React.useRef(false);const pixelUndoRef=React.useRef([]);const pixelRedoRef=React.useRef([]);
   const PIXEL_COLORS=["#f5576c","#feca57","#43e97b","#60a5fa","#f093fb","#fb923c","#22d3ee","#fff","#888","#333"];
   const PIXEL_SIZES=[{id:"16x16",label:"16×16",desc:"Icon",c:16,r:16},{id:"32x32",label:"32×32",desc:"Sprite",c:32,r:32},{id:"48x48",label:"48×48",desc:"Detailed",c:48,r:48},{id:"64x64",label:"64×64",desc:"Large",c:64,r:64},{id:"128x128",label:"128×128",desc:"HD",c:128,r:128},{id:"256x256",label:"256×256",desc:"Full",c:256,r:256}];
   const getPixels=()=>{const d=readNb();return d.pages?.[nbPageIdx]?.pixels||{};};
@@ -1764,15 +1774,27 @@ const NotebookPanel=()=>{
     const pixels=d.pages[nbPageIdx].pixels||{};const old=pixels[key]||null;
     if(erase){delete pixels[key];}
     else if(pixels[key]===color)delete pixels[key];else pixels[key]=color;
-    pixelUndoRef.current.push({key,old});d.pages[nbPageIdx].pixels=pixels;writeNb(d);
+    const newVal=pixels[key]||null;
+    pixelUndoRef.current.push({key,old,newVal});pixelRedoRef.current=[];
+    d.pages[nbPageIdx].pixels=pixels;writeNb(d);
     const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();
       ctx.fillStyle=pixels[key]||"#111";ctx.fillRect(col*cs,row*cs,cs,cs);
       ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;ctx.strokeRect(col*cs,row*cs,cs,cs);}};
-  const undoPixel=()=>{if(!pixelUndoRef.current.length)return;const{key,old}=pixelUndoRef.current.pop();
+  const undoPixel=()=>{if(!pixelUndoRef.current.length)return;const entry=pixelUndoRef.current.pop();
+    const{key,old}=entry;
     const d=readNb();if(!d.pages?.[nbPageIdx])return;const pixels=d.pages[nbPageIdx].pixels||{};
+    const cur=pixels[key]||null;
     if(old)pixels[key]=old;else delete pixels[key];d.pages[nbPageIdx].pixels=pixels;writeNb(d);
+    pixelRedoRef.current.push({key,old:cur,newVal:old});
     const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();const[r,cl]=key.split("-").map(Number);
       ctx.fillStyle=old||"#111";ctx.fillRect(cl*cs,r*cs,cs,cs);ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;ctx.strokeRect(cl*cs,r*cs,cs,cs);}};
+  const redoPixel=()=>{if(!pixelRedoRef.current.length)return;const entry=pixelRedoRef.current.pop();
+    const{key,old,newVal}=entry;
+    const d=readNb();if(!d.pages?.[nbPageIdx])return;const pixels=d.pages[nbPageIdx].pixels||{};
+    if(newVal)pixels[key]=newVal;else delete pixels[key];d.pages[nbPageIdx].pixels=pixels;writeNb(d);
+    pixelUndoRef.current.push({key,old,newVal});
+    const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();const[r,cl]=key.split("-").map(Number);
+      ctx.fillStyle=newVal||"#111";ctx.fillRect(cl*cs,r*cs,cs,cs);ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;ctx.strokeRect(cl*cs,r*cs,cs,cs);}};;
   const pixColorRef=React.useRef(pixelColor);pixColorRef.current=pixelColor;
   const pixEraserRef=React.useRef(pixelEraser);pixEraserRef.current=pixelEraser;
   const handlePixEvent=(e,isStart)=>{if(e.touches&&e.touches.length>1)return;
@@ -1797,7 +1819,7 @@ const NotebookPanel=()=>{
     textRef.current=page?.content||"";
     if(textareaRef.current)textareaRef.current.value=textRef.current;
     drawImgRef.current=null;drawCanvasRef.current=null;
-    setPageDrawMode(false);setPageZoom(1);setRenaming(false);undoRef.current=[textRef.current];redoRef.current=[];pixelUndoRef.current=[];
+    setPageDrawMode(false);setPageZoom(1);setRenaming(false);undoRef.current=[textRef.current];redoRef.current=[];pixelUndoRef.current=[];pixelRedoRef.current=[];drawUndoStack.current=[];drawRedoStack.current=[];
   },[nbPageIdx]);
 
   // Auto-save every 5s
@@ -1879,6 +1901,7 @@ const NotebookPanel=()=>{
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px 4px",flexShrink:0}}>
         <button onClick={goToc} style={btn()}>←</button>
         <button onClick={undoPixel} style={btn({color:"#aaa"})}>↩</button>
+        <button onClick={redoPixel} style={btn({color:"#aaa"})}>↪</button>
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
             <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
             {renaming?<div style={{display:"flex",gap:4,alignItems:"center"}}><input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
@@ -1916,6 +1939,7 @@ const NotebookPanel=()=>{
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px 4px",flexShrink:0}}>
         <button onClick={goToc} style={btn()}>←</button>
         {!pageDrawMode&&<><button onClick={undo} style={btn({color:"#aaa"})}>↩</button><button onClick={redo} style={btn({color:"#aaa"})}>↪</button></>}
+        {pageDrawMode&&<><button onClick={undoDraw} style={btn({color:"#aaa"})}>↩</button><button onClick={redoDraw} style={btn({color:"#aaa"})}>↪</button></>}
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
           <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
           {renaming?<div style={{display:"flex",gap:4,alignItems:"center"}}><input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
