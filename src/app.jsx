@@ -1308,7 +1308,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     const platRefs=React.useRef([]);
     const poolRefs=React.useRef([]);
     const dragRef=React.useRef(null);
-    const DRAG_THRESHOLD=8;
+    const DRAG_THRESHOLD=12;
 
     const initGame=()=>{
       const shuffled=[...BUDDIES].sort(()=>Math.random()-.5);
@@ -1348,25 +1348,23 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       return-1;
     };
 
-    // Move buddy between areas
+    // Atomic move using functional updates that don't nest
     const moveBuddy=(buddy,fromArea,fromIdx,toArea,toIdx)=>{
       if(fromArea===toArea&&fromIdx===toIdx)return;
       setLastResult(null);
-      if(fromArea==="pool"&&toArea==="platform"){
-        setPoolSlots(prev=>{const n=[...prev];n[fromIdx]=null;return n;});
-        setGuess(prev=>{const n=[...prev];
-          // If target slot has a buddy, send it to the pool slot we came from
-          if(n[toIdx]){setPoolSlots(pp=>{const nn=[...pp];nn[fromIdx]=n[toIdx];return nn;});}
-          n[toIdx]=buddy;return n;});
-      } else if(fromArea==="platform"&&toArea==="pool"){
-        setGuess(prev=>{const n=[...prev];n[fromIdx]=null;return n;});
-        setPoolSlots(prev=>{const n=[...prev];
-          if(n[toIdx]){setGuess(gg=>{const nn=[...gg];nn[fromIdx]=n[toIdx];return nn;});}
-          n[toIdx]=buddy;return n;});
-      } else if(fromArea==="platform"&&toArea==="platform"){
+      if(fromArea==="platform"&&toArea==="platform"){
         setGuess(prev=>{const n=[...prev];const swap=n[toIdx];n[toIdx]=buddy;n[fromIdx]=swap;return n;});
       } else if(fromArea==="pool"&&toArea==="pool"){
         setPoolSlots(prev=>{const n=[...prev];const swap=n[toIdx];n[toIdx]=buddy;n[fromIdx]=swap;return n;});
+      } else if(fromArea==="pool"&&toArea==="platform"){
+        // Read current guess to check for swap
+        const curGuess=[...guess];const swap=curGuess[toIdx];
+        setPoolSlots(prev=>{const n=[...prev];n[fromIdx]=swap;return n;});
+        setGuess(prev=>{const n=[...prev];n[toIdx]=buddy;return n;});
+      } else if(fromArea==="platform"&&toArea==="pool"){
+        const curPool=[...poolSlots];const swap=curPool[toIdx];
+        setGuess(prev=>{const n=[...prev];n[fromIdx]=swap;return n;});
+        setPoolSlots(prev=>{const n=[...prev];n[toIdx]=buddy;return n;});
       }
     };
 
