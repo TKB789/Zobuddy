@@ -2253,11 +2253,11 @@ const LearnPanel=()=>{
                   <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{fontSize:15,fontWeight:700,color:"#e8e0f0",flex:1}}>{c.term}</div>{c.cat&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"rgba(102,126,234,.1)",color:"#a8b4f0",fontWeight:700}}>{c.cat}</span>}</div>
                   {fcFlipped===c.id?<div style={{fontSize:14,opacity:.6,marginTop:4,lineHeight:1.4}}>{c.def}</div>:<div style={{fontSize:12,opacity:.3,marginTop:2}}>Tap to reveal</div>}
                 </div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+                {fcFlipped===c.id&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)"}}>
                   <button onClick={()=>{setFcEditId(c.id);setFcEditTerm(c.term);setFcEditDef(c.def);setFcEditCat(c.cat||"");}} style={{padding:"5px 14px",borderRadius:8,background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Edit</button>
                   <button onClick={()=>archiveCard(c.id)} style={{padding:"5px 14px",borderRadius:8,background:"rgba(254,202,87,.08)",border:"1px solid rgba(254,202,87,.15)",color:"#feca57",fontSize:12,fontWeight:700,cursor:"pointer"}}>🗃️ Archive</button>
                   <button onClick={()=>deleteCard(c.id)} style={{padding:"5px 14px",borderRadius:8,background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.15)",color:"#f5576c",fontSize:12,fontWeight:700,cursor:"pointer"}}>Delete</button>
-                </div>
+                </div>}
               </div>}
             </div>))}
           </div>}
