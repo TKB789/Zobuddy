@@ -1309,7 +1309,11 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       const shuffled=[...BUDDIES].sort(()=>Math.random()-.5);
       const picked=shuffled.slice(0,5);
       setAnswer(picked);
-      setPool([...picked].sort(()=>Math.random()-.5));
+      // Shuffle pool until it doesn't match the answer order
+      let poolOrder=[...picked];
+      do{poolOrder=[...picked].sort(()=>Math.random()-.5);}
+      while(poolOrder.every((b,i)=>b===picked[i]));
+      setPool(poolOrder);
       setGuess([null,null,null,null,null]);
       setWon(false);
       setAttempts(0);
@@ -1424,6 +1428,196 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     </div>);
   };
 
+  // ═══ DUAL N-BACK (cognitive training) ═══
+  const DualNBack=()=>{
+    const LETTERS="BCDFGHJKLMNPQRSTVWXZ".split("");
+    const[nLevel,setNLevel]=useState(2);
+    const[phase,setPhase]=useState("setup"); // setup | playing | feedback | done
+    const[sequence,setSequence]=useState([]); // {pos:0-8, letter:string}
+    const[step,setStep]=useState(0);
+    const[showStim,setShowStim]=useState(false);
+    const[posMatch,setPosMatch]=useState(false);
+    const[letMatch,setLetMatch]=useState(false);
+    const[results,setResults]=useState([]); // {posCorrect,letCorrect,posInput,letInput}
+    const[score,setScore]=useState(0);
+    const[best,setBest]=useState(()=>{try{return JSON.parse(localStorage.getItem("zo_best_nback"))||{};}catch{return{};}});
+    const[feedbackMsg,setFeedbackMsg]=useState(null);
+    const timerRef=React.useRef(null);
+    const TOTAL_ROUNDS=20+nLevel*2;
+    const STIM_TIME=2500;
+    const PAUSE_TIME=500;
+
+    const genSequence=()=>{
+      const seq=[];
+      for(let i=0;i<TOTAL_ROUNDS;i++){
+        let pos=Math.floor(Math.random()*9);
+        let letter=LETTERS[Math.floor(Math.random()*LETTERS.length)];
+        // Ensure some matches exist (~30% chance each)
+        if(i>=nLevel){
+          if(Math.random()<0.3)pos=seq[i-nLevel].pos;
+          if(Math.random()<0.3)letter=seq[i-nLevel].letter;
+        }
+        seq.push({pos,letter});
+      }
+      return seq;
+    };
+
+    const startGame=()=>{
+      const seq=genSequence();
+      setSequence(seq);setStep(0);setResults([]);setScore(0);
+      setPosMatch(false);setLetMatch(false);setFeedbackMsg(null);
+      setPhase("playing");setShowStim(true);
+    };
+
+    // Auto-advance steps
+    useEffect(()=>{
+      if(phase!=="playing")return;
+      timerRef.current=setTimeout(()=>{
+        // Record result for current step
+        if(step>=nLevel){
+          const isPosMatch=sequence[step].pos===sequence[step-nLevel].pos;
+          const isLetMatch=sequence[step].letter===sequence[step-nLevel].letter;
+          const posCorrect=(posMatch===isPosMatch);
+          const letCorrect=(letMatch===isLetMatch);
+          setResults(prev=>[...prev,{posCorrect,letCorrect,posInput:posMatch,letInput:letMatch,
+            actualPos:isPosMatch,actualLet:isLetMatch}]);
+          const pts=(posCorrect?1:0)+(letCorrect?1:0);
+          setScore(prev=>prev+pts);
+          // Brief feedback
+          if(posCorrect&&letCorrect)setFeedbackMsg("✓");
+          else if(!posCorrect&&!letCorrect)setFeedbackMsg("✗✗");
+          else setFeedbackMsg("½");
+        }
+        setShowStim(false);
+        setPosMatch(false);setLetMatch(false);
+        // Pause then next or finish
+        setTimeout(()=>{
+          setFeedbackMsg(null);
+          if(step+1>=TOTAL_ROUNDS){
+            setPhase("done");
+            // Calculate final score percentage
+            const maxPts=(TOTAL_ROUNDS-nLevel)*2;
+            const finalScore=results.reduce((a,r)=>(r.posCorrect?1:0)+(r.letCorrect?1:0)+a,0)+
+              ((()=>{const isPM=sequence[step]?.pos===sequence[step-nLevel]?.pos;const isLM=sequence[step]?.letter===sequence[step-nLevel]?.letter;return(posMatch===isPM?1:0)+(letMatch===isLM?1:0);})());
+            const pct=Math.round((finalScore/maxPts)*100);
+            const bestKey=`n${nLevel}`;
+            const prevBest=best[bestKey]||0;
+            if(pct>prevBest){const nb={...best,[bestKey]:pct};setBest(nb);try{localStorage.setItem("zo_best_nback",JSON.stringify(nb));}catch{}}
+          }else{
+            setStep(s=>s+1);setShowStim(true);
+          }
+        },PAUSE_TIME);
+      },STIM_TIME);
+      return()=>clearTimeout(timerRef.current);
+    },[phase,step,showStim]);
+
+    const maxPts=(TOTAL_ROUNDS-nLevel)*2;
+    const pct=maxPts>0?Math.round((score/maxPts)*100):0;
+    const bestPct=best[`n${nLevel}`]||0;
+
+    // ── SETUP SCREEN ──
+    if(phase==="setup")return(
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
+        <div style={{fontSize:36,marginBottom:8}}>🧠</div>
+        <div style={{fontSize:20,fontWeight:900,color:"#e8e0f0",marginBottom:4}}>Dual N-Back</div>
+        <div style={{fontSize:13,opacity:.4,textAlign:"center",maxWidth:280,marginBottom:16,lineHeight:1.5}}>
+          A letter appears in a 3×3 grid. Remember if the <span style={{color:"#60a5fa"}}>position</span> or <span style={{color:"#f093fb"}}>letter</span> matches the one from N steps ago.
+        </div>
+        <div style={{fontSize:14,fontWeight:800,opacity:.5,marginBottom:8}}>SELECT N-LEVEL</div>
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          {[1,2,3,4,5].map(n=>(
+            <button key={n} onClick={()=>setNLevel(n)}
+              style={{width:48,height:48,borderRadius:12,fontSize:18,fontWeight:900,cursor:"pointer",
+                background:nLevel===n?"linear-gradient(135deg,#667eea,#764ba2)":"rgba(255,255,255,.06)",
+                color:nLevel===n?"#fff":"#888",border:nLevel===n?"none":"1px solid rgba(255,255,255,.08)"}}>
+              {n}</button>
+          ))}
+        </div>
+        <div style={{fontSize:12,opacity:.3,marginBottom:4}}>{TOTAL_ROUNDS} rounds · Remember {nLevel} step{nLevel>1?"s":""} back</div>
+        {bestPct>0&&<div style={{fontSize:12,color:"#a78bfa",fontWeight:700,marginBottom:8}}>🏆 Best at {nLevel}-back: {bestPct}%</div>}
+        <button onClick={startGame}
+          style={{background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",borderRadius:14,padding:"14px 40px",fontSize:17,fontWeight:800,cursor:"pointer",marginTop:8}}>Start</button>
+      </div>);
+
+    // ── DONE SCREEN ──
+    if(phase==="done"){
+      const finalResults=[...results];
+      const finalScore=finalResults.reduce((a,r)=>(r.posCorrect?1:0)+(r.letCorrect?1:0)+a,0);
+      const finalPct=maxPts>0?Math.round((finalScore/maxPts)*100):0;
+      const isNewBest=finalPct>(best[`n${nLevel}`]||0)||finalPct===best[`n${nLevel}`];
+      return(<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
+        <div style={{fontSize:48,marginBottom:8}}>{finalPct>=80?"🧠":finalPct>=50?"🤔":"😵"}</div>
+        <div style={{fontSize:22,fontWeight:900,color:"#e8e0f0"}}>{nLevel}-Back Complete!</div>
+        <div style={{fontSize:36,fontWeight:900,color:finalPct>=80?"#43e97b":finalPct>=50?"#feca57":"#f5576c",marginTop:8}}>{finalPct}%</div>
+        <div style={{fontSize:14,opacity:.5,marginTop:4}}>{finalScore} / {maxPts} points</div>
+        {isNewBest&&<div style={{fontSize:14,color:"#43e97b",fontWeight:700,marginTop:4}}>🏆 New Best!</div>}
+        <div style={{display:"flex",gap:8,marginTop:16}}>
+          <button onClick={()=>{setGameKey(k=>k+1);setPhase("setup");}} style={{background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",borderRadius:12,padding:"10px 24px",fontSize:15,fontWeight:700,cursor:"pointer"}}>Play Again</button>
+          <button onClick={()=>setGame(null)} style={{background:"rgba(255,255,255,.08)",color:"#ccc",border:"1px solid rgba(255,255,255,.1)",borderRadius:12,padding:"10px 20px",fontSize:15,fontWeight:700,cursor:"pointer"}}>Exit</button>
+        </div>
+      </div>);
+    }
+
+    // ── PLAYING SCREEN ──
+    const cur=sequence[step];
+    const canRespond=step>=nLevel&&showStim;
+    return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 12px",overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 4px 8px",flexShrink:0}}>
+        <span style={{fontSize:13,fontWeight:800,color:"#a78bfa"}}>{nLevel}-Back</span>
+        <span style={{fontSize:13,fontWeight:700,opacity:.4}}>Round {step+1}/{TOTAL_ROUNDS}</span>
+        <span style={{fontSize:13,fontWeight:800,color:"#feca57"}}>Score: {score}</span>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.06)",marginBottom:10,flexShrink:0}}>
+        <div style={{height:"100%",borderRadius:2,background:"linear-gradient(90deg,#667eea,#764ba2)",width:`${((step+1)/TOTAL_ROUNDS)*100}%`,transition:"width .3s"}}/>
+      </div>
+
+      {/* 3x3 Grid */}
+      <div style={{display:"flex",justifyContent:"center",alignItems:"center",flex:1}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,width:"min(70vw,240px)",aspectRatio:"1"}}>
+          {Array.from({length:9},(_,i)=>{
+            const isActive=showStim&&cur&&cur.pos===i;
+            return(<div key={i} style={{borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
+              background:isActive?"rgba(102,126,234,.3)":"rgba(255,255,255,.04)",
+              border:isActive?"2px solid rgba(102,126,234,.6)":"1px solid rgba(255,255,255,.06)",
+              transition:"all .15s",aspectRatio:"1"}}>
+              {isActive&&<span style={{fontSize:"min(10vw,36px)",fontWeight:900,color:"#e8e0f0"}}>{cur.letter}</span>}
+            </div>);
+          })}
+        </div>
+      </div>
+
+      {/* Feedback flash */}
+      {feedbackMsg&&<div style={{textAlign:"center",fontSize:20,fontWeight:900,padding:4,flexShrink:0,
+        color:feedbackMsg==="✓"?"#43e97b":feedbackMsg==="½"?"#feca57":"#f5576c"}}>{feedbackMsg}</div>}
+
+      {/* Response buttons - thumb-friendly at bottom */}
+      <div style={{display:"flex",gap:12,padding:"12px 8px 16px",flexShrink:0,justifyContent:"center"}}>
+        <button onClick={()=>{if(canRespond)setPosMatch(p=>!p);}}
+          style={{flex:1,maxWidth:160,padding:"16px 8px",borderRadius:14,fontSize:15,fontWeight:800,cursor:canRespond?"pointer":"default",
+            background:posMatch?"rgba(96,165,250,.25)":"rgba(255,255,255,.04)",
+            border:posMatch?"2px solid rgba(96,165,250,.6)":"2px solid rgba(255,255,255,.08)",
+            color:posMatch?"#60a5fa":"rgba(255,255,255,.4)",
+            boxShadow:posMatch?"0 0 12px rgba(96,165,250,.3)":"none",
+            opacity:canRespond?1:.3,transition:"all .12s"}}>
+          📍 Position<br/><span style={{fontSize:11,fontWeight:600,opacity:.6}}>Match</span>
+        </button>
+        <button onClick={()=>{if(canRespond)setLetMatch(p=>!p);}}
+          style={{flex:1,maxWidth:160,padding:"16px 8px",borderRadius:14,fontSize:15,fontWeight:800,cursor:canRespond?"pointer":"default",
+            background:letMatch?"rgba(240,147,251,.25)":"rgba(255,255,255,.04)",
+            border:letMatch?"2px solid rgba(240,147,251,.6)":"2px solid rgba(255,255,255,.08)",
+            color:letMatch?"#f093fb":"rgba(255,255,255,.4)",
+            boxShadow:letMatch?"0 0 12px rgba(240,147,251,.3)":"none",
+            opacity:canRespond?1:.3,transition:"all .12s"}}>
+          🔤 Letter<br/><span style={{fontSize:11,fontWeight:600,opacity:.6}}>Match</span>
+        </button>
+      </div>
+      {step<nLevel&&<div style={{textAlign:"center",fontSize:12,opacity:.25,paddingBottom:8,flexShrink:0}}>Remember this — matching starts in {nLevel-step} step{nLevel-step>1?"s":""}</div>}
+    </div>);
+  };
+
   // ═══ GAME MENU ═══
   if(!game)return(
     <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column"}} onClick={onClose}>
@@ -1440,14 +1634,18 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
             {id:"rhythm",icon:"💕",name:"Memory Matchmaker",desc:"Flip cards and pair up the animals!",color:"#feca57",best:"zo_best_memory",bestLabel:" moves"},
             {id:"mines",icon:"🍀",name:"Lucky Clovers",desc:"Pick clovers without finding a bomb!",color:"#43e97b",best:"zo_best_mines",bestLabel:"s"},
             {id:"lineup",icon:"🔮",name:"Zobuddy Lineup",desc:"Guess the secret lineup from clues!",color:"#a78bfa",best:"zo_best_lineup",bestLabel:" guesses"},
+            {id:"nback",icon:"🧠",name:"Dual N-Back",desc:"Train your brain! Match position & letter from N steps ago.",color:"#60a5fa",best:"zo_best_nback",bestLabel:"%"},
           ].map(g=>{
-            const b=(()=>{try{return Number(localStorage.getItem(g.best))||0;}catch{return 0;}})();
+            const b=(()=>{try{const raw=localStorage.getItem(g.best);if(!raw)return 0;
+              if(g.id==="nback"){const obj=JSON.parse(raw);const vals=Object.values(obj);return vals.length?Math.max(...vals):0;}
+              return Number(raw)||0;}catch{return 0;}})();
+            const bestLabel2=g.id==="nback"&&b>0?"%":(g.bestLabel||"");
             return(<div key={g.id} onClick={()=>setGame(g.id)}
               style={{background:`${g.color}10`,border:`1px solid ${g.color}25`,borderRadius:16,padding:"16px",marginBottom:8,cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
               <div style={{fontSize:36}}>{g.icon}</div>
               <div style={{flex:1}}><div style={{fontSize:16,fontWeight:800,color:"#e8e0f0"}}>{g.name}</div>
                 <div style={{fontSize:13,opacity:.5,marginTop:2}}>{g.desc}</div>
-                {b>0&&<div style={{fontSize:12,color:g.color,fontWeight:700,marginTop:3}}>🏆 Best: {b}{g.bestLabel||""}</div>}</div>
+                {b>0&&<div style={{fontSize:12,color:g.color,fontWeight:700,marginTop:3}}>🏆 Best: {b}{bestLabel2}</div>}</div>
               <span style={{fontSize:18,opacity:.3}}>▶</span></div>);})}
         </div></div></div>);
 
@@ -1456,11 +1654,11 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     <div style={{position:"fixed",inset:0,zIndex:1000,background:"#0a0a1a",display:"flex",flexDirection:"column"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",flexShrink:0}}>
         <button onClick={()=>setGame(null)} style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,padding:"5px 12px",color:"#ccc",fontSize:13,cursor:"pointer",fontWeight:700}}>← Exit to Menu</button>
-        <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0"}}>{({bubbles:"🥦 Veggie Garden",breakout:"🍎 Fruit Blocks",rhythm:"💕 Memory Matchmaker",mines:"🍀 Lucky Clovers",lineup:"🔮 Zobuddy Lineup"})[game]||""}</div>
+        <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0"}}>{({bubbles:"🥦 Veggie Garden",breakout:"🍎 Fruit Blocks",rhythm:"💕 Memory Matchmaker",mines:"🍀 Lucky Clovers",lineup:"🔮 Zobuddy Lineup",nback:"🧠 Dual N-Back"})[game]||""}</div>
         <button onClick={onClose} style={{background:"rgba(255,255,255,.08)",border:"none",borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",fontSize:13}}>✕</button>
       </div>
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {game==="bubbles"&&<BubblePop key={gameKey}/>}{game==="breakout"&&<Breakout key={gameKey}/>}{game==="rhythm"&&<MemoryMatch key={gameKey}/>}{game==="mines"&&<Minesweeper key={gameKey}/>}{game==="lineup"&&<Lineup key={gameKey}/>}
+        {game==="bubbles"&&<BubblePop key={gameKey}/>}{game==="breakout"&&<Breakout key={gameKey}/>}{game==="rhythm"&&<MemoryMatch key={gameKey}/>}{game==="mines"&&<Minesweeper key={gameKey}/>}{game==="lineup"&&<Lineup key={gameKey}/>}{game==="nback"&&<DualNBack key={gameKey}/>}
       </div></div>);
 };
 const DAILY_GREETINGS=[
@@ -2709,7 +2907,7 @@ function DayPlanner({plannerData,plannerViewDate,setPlannerViewDate,MOODS,getPla
   // Backup: export all app data as JSON
   const exportBackup=()=>{
     const backup={_zobuddy_backup:true,_version:14,_date:new Date().toISOString()};
-    const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
+    const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup","zo_best_nback"];
     keys.forEach(k=>{try{const v=localStorage.getItem(k);if(v)backup[k]=JSON.parse(v);}catch{try{backup[k]=localStorage.getItem(k);}catch{}}});
     const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");
@@ -2722,7 +2920,7 @@ function DayPlanner({plannerData,plannerViewDate,setPlannerViewDate,MOODS,getPla
       if(!data?._zobuddy_backup){setRestoreError("Not a valid Zobuddy backup file.");return;}
       const keyMap={"app":"zodibuddies_v1","planner":"zodibuddy_planner_v1","clean":"zodibuddy_clean_v1","workout":"zodibuddy_workout_v1","budget":"zodibuddy_budget_v1","journal":"zodibuddy_journal_v1"};
       Object.entries(keyMap).forEach(([field,key])=>{if(data[field])localStorage.setItem(key,JSON.stringify(data[field]));});
-      const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
+      const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup","zo_best_nback"];
       allKeys.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,typeof data[k]==="string"?data[k]:JSON.stringify(data[k]));});
       setRestoreSuccess(true);
       setTimeout(()=>window.location.reload(),1500);
@@ -4652,7 +4850,7 @@ function SpiritAnimals(){
           <div style={{display:"flex",gap:6}}>
             <button onClick={()=>{
               const backup={_zobuddy_backup:true,_version:14,_date:new Date().toISOString()};
-              const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
+              const keys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup","zo_best_nback"];
               keys.forEach(k=>{try{const v=localStorage.getItem(k);if(v)backup[k]=JSON.parse(v);}catch{try{backup[k]=localStorage.getItem(k);}catch{}}});
               const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
               const url=URL.createObjectURL(blob);const a=document.createElement("a");
@@ -4668,7 +4866,7 @@ function SpiritAnimals(){
                   // Old format: named fields
                   Object.entries(keyMap).forEach(([field,key])=>{if(data[field])localStorage.setItem(key,JSON.stringify(data[field]));});
                   // New format: direct localStorage keys
-                  const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup"];
+                  const allKeys=["zodibuddies_v1","zodibuddy_planner_v1","zodibuddy_clean_v1","zodibuddy_workout_v1","zodibuddy_budget_v1","zodibuddy_journal_v1","zodibuddy_notebook_v1","zodibuddy_flashcards_v1","zodibuddy_fc_archive_v1","zodibuddy_learnfavs_v1","zodibuddy_news_v1","zo_best_bubbles","zo_best_breakout","zo_best_breakout_time","zo_best_memory","zo_best_mines","zo_best_lineup","zo_best_nback"];
                   allKeys.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,typeof data[k]==="string"?data[k]:JSON.stringify(data[k]));});
                   alert("✅ Restored! Reloading...");setTimeout(()=>window.location.reload(),500);
                 }catch{alert("Invalid backup file.");}};reader.readAsText(file);};input.click();
