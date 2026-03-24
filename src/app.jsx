@@ -2048,13 +2048,15 @@ const NotebookPanel=()=>{
     {nbData.pages.map((p,i)=>(
       <div key={i} onClick={()=>{drawImgRef.current=null;drawCanvasRef.current=null;pageIdxRef.current=i;setNbPageIdx(i);setNbView("page");}}
         style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:4,borderRadius:10,background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",cursor:"pointer"}}>
+        <div onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
+          <button onClick={()=>{if(!confirm(`Delete "${p.title}"?`))return;const d=readNb();d.pages.splice(i,1);saveNb(d);}} style={btn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.15)",color:"#f5576c",fontSize:10,padding:"3px 6px"})}>🗑</button>
+        </div>
         <span style={{fontSize:13,fontWeight:800,color:"rgba(102,126,234,.6)",minWidth:28}}>{i+1}.</span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title||"Untitled"}</div>
           <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
-        <div style={{display:"flex",gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+        <div onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
           <button onClick={()=>{const d=readNb();d.archive.push(d.pages[i]);d.pages.splice(i,1);saveNb(d);}} style={btn({background:"rgba(254,202,87,.08)",border:"1px solid rgba(254,202,87,.15)",color:"#feca57",fontSize:10,padding:"3px 6px"})}>🗃️</button>
-          <button onClick={()=>{if(!confirm(`Delete "${p.title}"?`))return;const d=readNb();d.pages.splice(i,1);saveNb(d);}} style={btn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.15)",color:"#f5576c",fontSize:10,padding:"3px 6px"})}>🗑</button>
         </div></div>))}
   </div>);
 };
