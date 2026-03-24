@@ -1014,7 +1014,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
           }else if(prizes[i].y>H+20){prizes.splice(i,1);}
         }
         // Win check
-        if(s.blocks.every(b=>!b.alive||b.unbreakable)){s.running=false;setWon(true);setScore(s.score);}
+        if(s.blocks.every(b=>!b.alive||b.unbreakable)){s.score+=1000;s.running=false;setWon(true);setScore(s.score);}
         // ─── DRAW ─────────────────────────────────
         ctx.fillStyle="#0a0a1a";ctx.fillRect(0,0,W,H);
         // Side borders
@@ -1065,7 +1065,8 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     useEffect(()=>{if((gameOver||won)&&score>best){setBest(score);try{localStorage.setItem("zo_best_breakout",String(score));}catch{}}},[gameOver,won]);
     useEffect(()=>{if(won){const t=Math.floor((Date.now()-startRef.current)/1000);setElapsed(t);if(bestTime===0||t<bestTime){setBestTime(t);try{localStorage.setItem("zo_best_breakout_time",String(t));}catch{}}}},[won]);
     if(gameOver||won)return(<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{fontSize:48,marginBottom:10}}>{won?"🎉":"🍎"}</div><div style={{fontSize:22,fontWeight:900,color:"#e8e0f0"}}>{won?"All Smashed!":"Game Over!"}</div>
+      <div style={{fontSize:48,marginBottom:10}}>{won?"🍧":"🍎"}</div><div style={{fontSize:22,fontWeight:900,color:"#e8e0f0"}}>{won?"Yummy Dessert!":"Game Over!"}</div>
+      {won&&<div style={{fontSize:14,color:"#43e97b",fontWeight:700,marginTop:2}}>+1000 bonus for clearing all fruits!</div>}
       <div style={{fontSize:18,fontWeight:800,color:"#feca57",marginTop:4}}>Score: {score} · {elapsed}s</div>
       {won&&(bestTime===0||elapsed<=bestTime)&&<div style={{fontSize:14,color:"#43e97b",fontWeight:700,marginTop:4}}>🏆 Best Time!</div>}
       {score>=best&&score>0&&<div style={{fontSize:14,color:"#43e97b",fontWeight:700,marginTop:2}}>🏆 High Score!</div>}
@@ -1305,7 +1306,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
         <div style={{flex:1,padding:"0 16px 16px",overflowY:"auto"}}>
           {[
             {id:"bubbles",icon:"🥦",name:"Veggie Garden",desc:"Harvest veggies fast! Avoid mushrooms & poison.",color:"#43e97b",best:"zo_best_bubbles"},
-            {id:"breakout",icon:"🍎",name:"Fruit Blocks",desc:"Smash fruits, dodge ice blocks!",color:"#f5576c",best:"zo_best_breakout"},
+            {id:"breakout",icon:"🍎",name:"Fruit Blocks",desc:"Break up the frozen fruits for a yummy dessert! 🍧",color:"#f5576c",best:"zo_best_breakout"},
             {id:"rhythm",icon:"💕",name:"Memory Matchmaker",desc:"Flip cards and pair up the animals!",color:"#feca57",best:"zo_best_memory",bestLabel:" moves"},
             {id:"mines",icon:"🍀",name:"Lucky Clovers",desc:"Pick clovers without finding a bomb!",color:"#43e97b",best:"zo_best_mines",bestLabel:"s"},
           ].map(g=>{
