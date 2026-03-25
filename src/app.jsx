@@ -1435,75 +1435,74 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     const hoverPlat=dragging&&dragging.isDrag?findPlatSlotAt(dragging.x,dragging.y):-1;
     const hoverPool=dragging&&dragging.isDrag?findPoolSlotAt(dragging.x,dragging.y):-1;
 
-    return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 16px",overflow:"auto",touchAction:"none",userSelect:"none",WebkitUserSelect:"none"}}
+    return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 16px",overflow:"hidden",touchAction:"none",userSelect:"none",WebkitUserSelect:"none"}}
       onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-      <div style={{textAlign:"center",marginBottom:10}}>
-        <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0"}}>🔮 Guess the Secret Lineup</div>
-        <div style={{fontSize:12,opacity:.35,marginTop:3}}>Drag or tap buddies into position</div>
-        <div style={{fontSize:12,opacity:.3,marginTop:2}}>Checks: {attempts}{best>0?` · Best: ${best}`:""}</div>
-      </div>
+      {/* Fixed game area */}
+      <div style={{flexShrink:0}}>
+        <div style={{textAlign:"center",marginBottom:8}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0"}}>🔮 Guess the Secret Lineup</div>
+          <div style={{fontSize:12,opacity:.35,marginTop:3}}>Drag or tap buddies into position</div>
+          <div style={{fontSize:12,opacity:.3,marginTop:2}}>Checks: {attempts}{best>0?` · Best: ${best}`:""}</div>
+        </div>
 
-      {lastResult!==null&&<div style={{textAlign:"center",padding:"10px 14px",marginBottom:10,borderRadius:12,
-        background:lastResult>=4?"rgba(67,233,123,.12)":lastResult>=2?"rgba(254,202,87,.1)":"rgba(245,87,108,.08)",
-        border:lastResult>=4?"1px solid rgba(67,233,123,.25)":lastResult>=2?"1px solid rgba(254,202,87,.2)":"1px solid rgba(245,87,108,.15)"}}>
-        <div style={{fontSize:28,fontWeight:900,color:lastResult>=4?"#43e97b":lastResult>=2?"#feca57":"#f5576c"}}>{lastResult} / 5</div>
-        <div style={{fontSize:13,opacity:.6,marginTop:2}}>{lastResult===0?"None in the right spot":lastResult===1?"1 buddy is in the correct position":`${lastResult} buddies are in the correct position`}</div>
-        <div style={{fontSize:11,opacity:.3,marginTop:4}}>Rearrange and check again!</div>
-      </div>}
+        {/* Result banner - always reserved height */}
+        <div style={{minHeight:lastResult!==null?0:0,marginBottom:lastResult!==null?8:0}}>
+          {lastResult!==null&&<div style={{textAlign:"center",padding:"8px 14px",borderRadius:12,
+            background:lastResult>=4?"rgba(67,233,123,.12)":lastResult>=2?"rgba(254,202,87,.1)":"rgba(245,87,108,.08)",
+            border:lastResult>=4?"1px solid rgba(67,233,123,.25)":lastResult>=2?"1px solid rgba(254,202,87,.2)":"1px solid rgba(245,87,108,.15)"}}>
+            <div style={{fontSize:24,fontWeight:900,color:lastResult>=4?"#43e97b":lastResult>=2?"#feca57":"#f5576c"}}>{lastResult} / 5</div>
+            <div style={{fontSize:12,opacity:.5,marginTop:1}}>{lastResult===0?"None in the right spot":lastResult===1?"1 buddy is in the correct position":`${lastResult} buddies are in the correct position`}</div>
+          </div>}
+        </div>
 
-      <div style={{background:"rgba(167,139,250,.06)",border:"1px solid rgba(167,139,250,.15)",borderRadius:14,padding:"12px 8px",marginBottom:12}}>
-        <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>LINEUP PLATFORM</div>
-        <div style={{display:"flex",gap:6,justifyContent:"center"}}>
-          {guess.map((b,i)=>{
-            const isHover=hoverPlat===i;const isDrag=isDraggingFrom("platform",i);
-            return(<div key={"p"+i} ref={el=>platRefs.current[i]=el}
-              onTouchStart={b?onTouchStart(b,"platform",i):undefined}
-              style={{width:56,height:64,borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-                background:isHover?"rgba(167,139,250,.3)":b?"rgba(167,139,250,.15)":"rgba(255,255,255,.03)",
-                border:isHover?"2px solid rgba(167,139,250,.7)":b?"2px solid rgba(167,139,250,.4)":"2px dashed rgba(255,255,255,.12)",
-                cursor:b?"grab":"default",transition:"border .1s, background .1s",opacity:isDrag?.25:1}}>
-              {b&&!isDrag?<span style={{fontSize:30}}>{b}</span>:<span style={{fontSize:16,opacity:.15}}>{i+1}</span>}
-            </div>);
-          })}
+        <div style={{background:"rgba(167,139,250,.06)",border:"1px solid rgba(167,139,250,.15)",borderRadius:14,padding:"10px 8px",marginBottom:8}}>
+          <div style={{fontSize:10,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:6,letterSpacing:1}}>LINEUP PLATFORM</div>
+          <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+            {guess.map((b,i)=>{
+              const isHover=hoverPlat===i;const isDrag=isDraggingFrom("platform",i);
+              return(<div key={"p"+i} ref={el=>platRefs.current[i]=el}
+                onTouchStart={b?onTouchStart(b,"platform",i):undefined}
+                style={{width:56,height:64,borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+                  background:isHover?"rgba(167,139,250,.3)":b?"rgba(167,139,250,.15)":"rgba(255,255,255,.03)",
+                  border:isHover?"2px solid rgba(167,139,250,.7)":b?"2px solid rgba(167,139,250,.4)":"2px dashed rgba(255,255,255,.12)",
+                  cursor:b?"grab":"default",transition:"border .1s, background .1s",opacity:isDrag?.25:1}}>
+                {b&&!isDrag?<span style={{fontSize:30}}>{b}</span>:<span style={{fontSize:16,opacity:.15}}>{i+1}</span>}
+              </div>);
+            })}
+          </div>
+        </div>
+
+        <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:"10px 8px",marginBottom:8}}>
+          <div style={{fontSize:10,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:6,letterSpacing:1}}>STARTING AREA</div>
+          <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+            {poolSlots.map((b,i)=>{
+              const isHover=hoverPool===i;const isDrag=isDraggingFrom("pool",i);
+              return(<div key={"s"+i} ref={el=>poolRefs.current[i]=el}
+                onTouchStart={b?onTouchStart(b,"pool",i):undefined}
+                style={{width:52,height:56,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
+                  background:isHover?"rgba(255,255,255,.1)":b?"rgba(255,255,255,.06)":"transparent",
+                  border:isHover?"2px solid rgba(255,255,255,.3)":b?"2px solid rgba(255,255,255,.1)":"2px solid transparent",
+                  borderBottom:isHover?"2px solid rgba(255,255,255,.3)":b?"2px solid rgba(255,255,255,.1)":"2px solid rgba(255,255,255,.15)",
+                  cursor:b?"grab":"default",transition:"border .1s, background .1s",opacity:isDrag?.25:1}}>
+                {b&&!isDrag?<span style={{fontSize:28}}>{b}</span>:null}
+              </div>);
+            })}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:6}}>
+          <button onClick={checkGuess} disabled={guess.some(g=>g===null)}
+            style={{background:guess.some(g=>g===null)?"rgba(255,255,255,.04)":"linear-gradient(135deg,#667eea,#764ba2)",
+              color:guess.some(g=>g===null)?"#555":"#fff",border:"none",borderRadius:12,padding:"10px 28px",fontSize:15,fontWeight:800,cursor:guess.some(g=>g===null)?"default":"pointer"}}>
+            {lastResult!==null?"Check Again":"Check Lineup"}</button>
+          {history.length>0&&<button onClick={()=>setShowHistory(s=>!s)}
+            style={{background:showHistory?"rgba(167,139,250,.12)":"rgba(255,255,255,.04)",border:showHistory?"1px solid rgba(167,139,250,.3)":"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"10px 14px",fontSize:13,fontWeight:700,color:showHistory?"#a78bfa":"#888",cursor:"pointer"}}>
+            {showHistory?"Hide":"History"} ({history.length})</button>}
         </div>
       </div>
 
-      <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:"12px 8px",marginBottom:12}}>
-        <div style={{fontSize:11,fontWeight:700,opacity:.3,textAlign:"center",marginBottom:8,letterSpacing:1}}>STARTING AREA</div>
-        <div style={{display:"flex",gap:6,justifyContent:"center"}}>
-          {poolSlots.map((b,i)=>{
-            const isHover=hoverPool===i;const isDrag=isDraggingFrom("pool",i);
-            return(<div key={"s"+i} ref={el=>poolRefs.current[i]=el}
-              onTouchStart={b?onTouchStart(b,"pool",i):undefined}
-              style={{width:52,height:56,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
-                background:isHover?"rgba(255,255,255,.1)":b?"rgba(255,255,255,.06)":"transparent",
-                border:isHover?"2px solid rgba(255,255,255,.3)":b?"2px solid rgba(255,255,255,.1)":"2px solid transparent",
-                borderBottom:isHover?"2px solid rgba(255,255,255,.3)":b?"2px solid rgba(255,255,255,.1)":"2px solid rgba(255,255,255,.15)",
-                cursor:b?"grab":"default",transition:"border .1s, background .1s",opacity:isDrag?.25:1}}>
-              {b&&!isDrag?<span style={{fontSize:28}}>{b}</span>:null}
-            </div>);
-          })}
-        </div>
-      </div>
-
-      <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:8}}>
-        <button onClick={checkGuess} disabled={guess.some(g=>g===null)}
-          style={{background:guess.some(g=>g===null)?"rgba(255,255,255,.04)":"linear-gradient(135deg,#667eea,#764ba2)",
-            color:guess.some(g=>g===null)?"#555":"#fff",border:"none",borderRadius:12,padding:"12px 32px",fontSize:16,fontWeight:800,cursor:guess.some(g=>g===null)?"default":"pointer"}}>
-          {lastResult!==null?"Check Again":"Check Lineup"}</button>
-      </div>
-
-      {history.length>0&&!showHistory&&<div style={{textAlign:"center",marginBottom:8}}>
-        <button onClick={()=>setShowHistory(true)}
-          style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,padding:"8px 16px",fontSize:12,fontWeight:700,color:"#888",cursor:"pointer"}}>
-          👁 Reveal History ({history.length} guess{history.length>1?"es":""})</button>
-      </div>}
-
-      {showHistory&&history.length>0&&<div style={{marginBottom:8}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-          <span style={{fontSize:12,fontWeight:800,opacity:.4}}>GUESS HISTORY</span>
-          <button onClick={()=>setShowHistory(false)} style={{background:"none",border:"none",color:"#888",fontSize:11,cursor:"pointer",fontWeight:700}}>Hide</button>
-        </div>
+      {/* Scrollable history area */}
+      {showHistory&&history.length>0&&<div style={{flex:1,overflowY:"auto",minHeight:0,paddingTop:4}}>
         {history.map((h,hi)=>(
           <div key={hi} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",marginBottom:2,borderRadius:8,
             background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)"}}>
@@ -1524,6 +1523,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
         <span style={{fontSize:30}}>{dragging.buddy}</span>
       </div>}
     </div>);
+
   };
 
 
