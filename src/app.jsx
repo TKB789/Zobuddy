@@ -442,8 +442,8 @@ const BuddyDisplay=({animal,state,filter="none",size=160})=>{
   let crown=null;if(streak>=30)crown="diamond";else if(streak>=21)crown="gold";else if(streak>=14)crown="silver";else if(streak>=7)crown="bronze";
   // Transforms: apply all, but handle priority for conflicting size effects
   const tf=[];
-  // Size: deflate and shrink can coexist — deflate squashes, shrink scales down
-  if(has("deflate")&&has("shrink"))tf.push("scaleX(1.1) scaleY(0.4)");
+  // Size: deflate and shrink can coexist — when shrink active, deflate stays within shrunken size
+  if(has("deflate")&&has("shrink"))tf.push("scaleX(0.7) scaleY(0.22)");
   else if(has("deflate"))tf.push("scaleX(1.3) scaleY(0.55)");
   else if(has("shrink")||has("tiny"))tf.push("scale(0.55)");
   // Orientation: upside and melts are mutually exclusive (upside wins)
