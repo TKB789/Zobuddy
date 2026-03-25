@@ -1373,33 +1373,52 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       if(emptyPool>=0)moveBuddy(buddy,"platform",idx,"pool",emptyPool);
     };
 
-    const onTouchStart=(buddy,fromArea,fromIdx)=>(e)=>{
-      if(!buddy)return;e.preventDefault();
-      const t=e.touches[0];
-      dragRef.current={buddy,fromArea,fromIdx,x:t.clientX,y:t.clientY,startX:t.clientX,startY:t.clientY,isDrag:false};
-    };
-    const onTouchMove=(e)=>{
-      if(!dragRef.current)return;e.preventDefault();
-      const t=e.touches[0];
-      const dx=t.clientX-dragRef.current.startX,dy=t.clientY-dragRef.current.startY;
-      const isDrag=dragRef.current.isDrag||Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD;
-      dragRef.current={...dragRef.current,x:t.clientX,y:t.clientY,isDrag};
-      if(isDrag)setDragging({...dragRef.current});
-    };
-    const onTouchEnd=(e)=>{
-      if(!dragRef.current)return;
-      const d=dragRef.current;const t=e.changedTouches[0];
-      if(!d.isDrag){
-        if(d.fromArea==="pool")tapFromPool(d.fromIdx);
-        else tapFromPlatform(d.fromIdx);
-      } else {
-        const platIdx=findPlatSlotAt(t.clientX,t.clientY);
-        const poolIdx=findPoolSlotAt(t.clientX,t.clientY);
-        if(platIdx>=0)moveBuddy(d.buddy,d.fromArea,d.fromIdx,"platform",platIdx);
-        else if(poolIdx>=0)moveBuddy(d.buddy,d.fromArea,d.fromIdx,"pool",poolIdx);
+    // All touch handling on container - find which buddy was touched by position
+    const findTouchedBuddy=(x,y)=>{
+      for(let i=0;i<5;i++){
+        const el=platRefs.current[i];if(el){const r=el.getBoundingClientRect();
+          if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom&&guessRef.current[i])return{buddy:guessRef.current[i],fromArea:"platform",fromIdx:i};}
+        const el2=poolRefs.current[i];if(el2){const r=el2.getBoundingClientRect();
+          if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom&&poolSlotsRef.current[i])return{buddy:poolSlotsRef.current[i],fromArea:"pool",fromIdx:i};}
       }
-      dragRef.current=null;setDragging(null);
+      return null;
     };
+    const gameContainerRef=React.useRef(null);
+    useEffect(()=>{
+      const node=gameContainerRef.current;if(!node)return;
+      const onTS=(e)=>{
+        const t=e.touches[0];const hit=findTouchedBuddy(t.clientX,t.clientY);
+        if(!hit)return;
+        e.preventDefault();
+        dragRef.current={...hit,x:t.clientX,y:t.clientY,startX:t.clientX,startY:t.clientY,isDrag:false};
+      };
+      const onTM=(e)=>{
+        if(!dragRef.current)return;e.preventDefault();
+        const t=e.touches[0];
+        const dx=t.clientX-dragRef.current.startX,dy=t.clientY-dragRef.current.startY;
+        const isDrag=dragRef.current.isDrag||Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD;
+        dragRef.current={...dragRef.current,x:t.clientX,y:t.clientY,isDrag};
+        if(isDrag)setDragging({...dragRef.current});
+      };
+      const onTE=(e)=>{
+        if(!dragRef.current)return;
+        const d=dragRef.current;const t=e.changedTouches[0];
+        if(!d.isDrag){
+          if(d.fromArea==="pool")tapFromPool(d.fromIdx);
+          else tapFromPlatform(d.fromIdx);
+        } else {
+          const platIdx=findPlatSlotAt(t.clientX,t.clientY);
+          const poolIdx=findPoolSlotAt(t.clientX,t.clientY);
+          if(platIdx>=0)moveBuddy(d.buddy,d.fromArea,d.fromIdx,"platform",platIdx);
+          else if(poolIdx>=0)moveBuddy(d.buddy,d.fromArea,d.fromIdx,"pool",poolIdx);
+        }
+        dragRef.current=null;setDragging(null);
+      };
+      node.addEventListener("touchstart",onTS,{passive:false});
+      node.addEventListener("touchmove",onTM,{passive:false});
+      node.addEventListener("touchend",onTE);
+      return()=>{node.removeEventListener("touchstart",onTS);node.removeEventListener("touchmove",onTM);node.removeEventListener("touchend",onTE);};
+    });
 
     if(!answer)return null;
 
@@ -1436,22 +1455,26 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     const hoverPool=dragging&&dragging.isDrag?findPoolSlotAt(dragging.x,dragging.y):-1;
 
     return(<div style={{flex:1,display:"flex",flexDirection:"column",padding:"8px 16px",overflow:"hidden",touchAction:"none",userSelect:"none",WebkitUserSelect:"none"}}
-      onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+      ref={gameContainerRef}>
       {/* Fixed game area */}
       <div style={{flexShrink:0}}>
         <div style={{textAlign:"center",marginBottom:8}}>
-          <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0"}}>🔮 Guess the Secret Lineup</div>
+          <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0"}}>Guess the Secret Lineup</div>
           <div style={{fontSize:12,opacity:.35,marginTop:3}}>Drag or tap buddies into position</div>
           <div style={{fontSize:12,opacity:.3,marginTop:2}}>Checks: {attempts}{best>0?` · Best: ${best}`:""}</div>
         </div>
 
         {/* Result banner - always reserved height */}
-        <div style={{minHeight:lastResult!==null?0:0,marginBottom:lastResult!==null?8:0}}>
-          {lastResult!==null&&<div style={{textAlign:"center",padding:"8px 14px",borderRadius:12,
+        <div style={{height:52,marginBottom:4,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {lastResult!==null?<div style={{textAlign:"center",padding:"6px 14px",borderRadius:12,width:"100%",
             background:lastResult>=4?"rgba(67,233,123,.12)":lastResult>=2?"rgba(254,202,87,.1)":"rgba(245,87,108,.08)",
             border:lastResult>=4?"1px solid rgba(67,233,123,.25)":lastResult>=2?"1px solid rgba(254,202,87,.2)":"1px solid rgba(245,87,108,.15)"}}>
-            <div style={{fontSize:24,fontWeight:900,color:lastResult>=4?"#43e97b":lastResult>=2?"#feca57":"#f5576c"}}>{lastResult} / 5</div>
-            <div style={{fontSize:12,opacity:.5,marginTop:1}}>{lastResult===0?"None in the right spot":lastResult===1?"1 buddy is in the correct position":`${lastResult} buddies are in the correct position`}</div>
+            <div style={{fontSize:22,fontWeight:900,color:lastResult>=4?"#43e97b":lastResult>=2?"#feca57":"#f5576c"}}>{lastResult} / 5</div>
+            <div style={{fontSize:11,opacity:.5}}>{lastResult===0?"None correct":lastResult===1?"1 correct position":`${lastResult} correct positions`}</div>
+          </div>:<div style={{textAlign:"center",padding:"6px 14px",borderRadius:12,width:"100%",
+            background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.04)"}}>
+            <div style={{fontSize:22,fontWeight:900,opacity:.15}}>? / 5</div>
+            <div style={{fontSize:11,opacity:.15}}>Place all buddies and check</div>
           </div>}
         </div>
 
@@ -1461,7 +1484,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
             {guess.map((b,i)=>{
               const isHover=hoverPlat===i;const isDrag=isDraggingFrom("platform",i);
               return(<div key={"p"+i} ref={el=>platRefs.current[i]=el}
-                onTouchStart={b?onTouchStart(b,"platform",i):undefined}
+                
                 style={{width:56,height:64,borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
                   background:isHover?"rgba(167,139,250,.3)":b?"rgba(167,139,250,.15)":"rgba(255,255,255,.03)",
                   border:isHover?"2px solid rgba(167,139,250,.7)":b?"2px solid rgba(167,139,250,.4)":"2px dashed rgba(255,255,255,.12)",
@@ -1478,7 +1501,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
             {poolSlots.map((b,i)=>{
               const isHover=hoverPool===i;const isDrag=isDraggingFrom("pool",i);
               return(<div key={"s"+i} ref={el=>poolRefs.current[i]=el}
-                onTouchStart={b?onTouchStart(b,"pool",i):undefined}
+                
                 style={{width:52,height:56,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",
                   background:isHover?"rgba(255,255,255,.1)":b?"rgba(255,255,255,.06)":"transparent",
                   border:isHover?"2px solid rgba(255,255,255,.3)":b?"2px solid rgba(255,255,255,.1)":"2px solid transparent",
