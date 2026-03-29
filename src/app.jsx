@@ -8518,18 +8518,35 @@ const NotebookPanel=()=>{
   const startRename=()=>{const d=readNb();const page=d.pages?.[pageIdxRef.current];setRenameVal(page?.title||"");setRenaming(true);};
   const doRename=()=>{if(!renameVal.trim())return;save("title",renameVal.trim());setRenaming(false);syncState();};
 
-  // ─── CHECKLIST HELPERS ─────────────────────────────────────────
-  const[clNewItem,setClNewItem]=useState("");
-  const getChecklist=()=>{const d=readNb();return d.pages?.[pageIdxRef.current]?.checklist||[];};
-  const saveChecklist=(items)=>{save("checklist",items);syncState();};
-  const addChecklistItem=()=>{if(!clNewItem.trim())return;const items=[...getChecklist(),{id:Date.now(),text:clNewItem.trim(),done:false}];saveChecklist(items);setClNewItem("");};
-  const toggleChecklistItem=(id)=>{const items=getChecklist().map(it=>it.id===id?{...it,done:!it.done}:it);saveChecklist(items);};
-  const deleteChecklistItem=(id)=>{const items=getChecklist().filter(it=>it.id!==id);saveChecklist(items);};
-  const moveChecklistItem=(id,dir)=>{const items=[...getChecklist()];const idx=items.findIndex(it=>it.id===id);if(idx<0)return;const ni=idx+dir;if(ni<0||ni>=items.length)return;[items[idx],items[ni]]=[items[ni],items[idx]];saveChecklist(items);};
-  const[clEditId,setClEditId]=useState(null);
-  const[clEditText,setClEditText]=useState("");
-  const startEditCl=(item)=>{setClEditId(item.id);setClEditText(item.text);};
-  const commitEditCl=()=>{if(!clEditText.trim()){setClEditId(null);return;}const items=getChecklist().map(it=>it.id===clEditId?{...it,text:clEditText.trim()}:it);saveChecklist(items);setClEditId(null);};
+  // ─── INLINE CHECKBOX (works in any note type) ──────────────────
+  // ☑ button inserts "[ ] " at cursor position in textarea
+  const insertCheckbox=()=>{
+    const el=textareaRef.current;if(!el)return;
+    const start=el.selectionStart;const end=el.selectionEnd;const val=el.value;
+    // Find start of current line
+    const lineStart=val.lastIndexOf("\n",start-1)+1;
+    const before=val.slice(0,lineStart);const after=val.slice(lineStart);
+    const newVal=before+"[ ] "+after;
+    el.value=newVal;textRef.current=newVal;
+    el.selectionStart=el.selectionEnd=start+4;
+    el.focus();saveText();
+  };
+  // Toggle checkbox on a specific line: [ ] ↔ [x], and force re-render
+  const[cbTick,setCbTick]=useState(0);
+  const[checklistView,setChecklistView]=useState(false);
+  const toggleInlineCheckbox=(lineIdx)=>{
+    const content=textRef.current||"";
+    const lines=content.split("\n");
+    if(lineIdx>=lines.length)return;
+    const line=lines[lineIdx];
+    if(line.startsWith("[ ] "))lines[lineIdx]="[x] "+line.slice(4);
+    else if(line.startsWith("[x] "))lines[lineIdx]="[ ] "+line.slice(4);
+    else return;
+    const newVal=lines.join("\n");
+    textRef.current=newVal;
+    const el=textareaRef.current;if(el)el.value=newVal;
+    saveText();setCbTick(t=>t+1);
+  };
 
   // ─── TOC REORDER ───────────────────────────────────────────────
   const movePageInToc=(idx,dir)=>{const d=readNb();const ni=idx+dir;if(ni<0||ni>=d.pages.length)return;[d.pages[idx],d.pages[ni]]=[d.pages[ni],d.pages[idx]];saveNb(d);setNbExpandedIdx(ni);};
@@ -8694,9 +8711,9 @@ const NotebookPanel=()=>{
     textRef.current=next;if(textareaRef.current)textareaRef.current.value=next;saveText();};
 
   // ─── NAVIGATION ─────────────────────────────────────────────────
-  const goToc=()=>{saveAll();syncState();setPageDrawMode(false);setPageZoom(1);setNbView("toc");};
-  const goPrev=()=>{saveAll();drawImgRef.current=null;drawCanvasRef.current=null;pageIdxRef.current=pageIdxRef.current-1;setNbPageIdx(i=>i-1);};
-  const goNext=()=>{saveAll();drawImgRef.current=null;drawCanvasRef.current=null;pageIdxRef.current=pageIdxRef.current+1;setNbPageIdx(i=>i+1);};
+  const goToc=()=>{saveAll();syncState();setPageDrawMode(false);setPageZoom(1);setChecklistView(false);setNbView("toc");};
+  const goPrev=()=>{saveAll();drawImgRef.current=null;drawCanvasRef.current=null;pageIdxRef.current=pageIdxRef.current-1;setChecklistView(false);setNbPageIdx(i=>i-1);};
+  const goNext=()=>{saveAll();drawImgRef.current=null;drawCanvasRef.current=null;pageIdxRef.current=pageIdxRef.current+1;setChecklistView(false);setNbPageIdx(i=>i+1);};
 
   // ─── STYLES ─────────────────────────────────────────────────────
   const hs=20,hcol=hs*1.5,hrow=Math.round(hs*Math.sqrt(3)),hoff=Math.round(hrow/2);
@@ -8797,8 +8814,8 @@ const NotebookPanel=()=>{
     return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px 4px",flexShrink:0}}>
         <button onClick={goToc} style={btn()}>←</button>
-        {page.type!=="checklist"&&!pageDrawMode&&<><button onClick={undo} style={btn({color:"#aaa"})}>↩</button><button onClick={redo} style={btn({color:"#aaa"})}>↪</button></>}
-        {page.type!=="checklist"&&pageDrawMode&&<><button onClick={undoDraw} style={btn({color:"#aaa"})}>↩</button><button onClick={redoDraw} style={btn({color:"#aaa"})}>↪</button></>}
+        {!pageDrawMode&&<><button onClick={undo} style={btn({color:"#aaa"})}>↩</button><button onClick={redo} style={btn({color:"#aaa"})}>↪</button></>}
+        {pageDrawMode&&<><button onClick={undoDraw} style={btn({color:"#aaa"})}>↩</button><button onClick={redoDraw} style={btn({color:"#aaa"})}>↪</button></>}
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
           <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
           {renaming?<div style={{display:"flex",gap:4,alignItems:"center"}}><input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
@@ -8808,8 +8825,14 @@ const NotebookPanel=()=>{
           :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
           <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
-        {page.type!=="checklist"&&<button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"🔡":"🎨"}</button>}
-        {page.type!=="checklist"&&<button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>}
+        {!pageDrawMode&&page.type!=="pixel"&&<button onClick={()=>{
+          const content=textRef.current||"";const hasBoxes=content.includes("[ ] ")||content.includes("[x] ");
+          if(checklistView){setChecklistView(false);}
+          else if(hasBoxes){setChecklistView(true);}
+          else{insertCheckbox();}
+        }} style={btn(checklistView?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",padding:"6px 8px"}:{color:"#aaa",padding:"6px 8px"})}>☑</button>}
+        <button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"🔡":"🎨"}</button>
+        <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>
       </div>
       {pageDrawMode&&<div style={{display:"flex",flexDirection:"column",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -8834,7 +8857,7 @@ const NotebookPanel=()=>{
             <div style={{width:Math.max(s,2),height:Math.max(s,2),borderRadius:"50%",background:drawColor}}/></div>))}
         </div>}
       </div>}
-      {!pageDrawMode&&page.type!=="checklist"&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
+      {!pageDrawMode&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
         <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 8px"})}>−</button>
         <span style={{fontSize:11,opacity:.4}}>{Math.round(pageZoom*100)}%</span>
         <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 8px"})}>+</button>
@@ -8842,48 +8865,31 @@ const NotebookPanel=()=>{
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
         <div style={{transform:pageDrawMode?undefined:`scale(${pageZoom})`,transformOrigin:"top left",width:pageDrawMode?undefined:`${100/pageZoom}%`}}>
           <PageBg type={page.type}>
-            {!pageDrawMode&&page.type!=="checklist"&&<div>
+            {!pageDrawMode&&<div style={{position:"relative"}}>
               {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",height:800,pointerEvents:"none",opacity:.7,zIndex:2}}/>}
-              <textarea ref={(el)=>{if(el){
+              {/* Checklist view: rendered view with clickable checkboxes + strikethrough */}
+              {checklistView&&(()=>{const content=textRef.current||"";const lines=content.split("\n");const sty=ts(page.type);
+                return(<div style={{...sty,minHeight:800,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+                  {lines.map((line,li)=>{
+                    const isChecked=line.startsWith("[x] ");const isUnchecked=line.startsWith("[ ] ");
+                    if(isChecked||isUnchecked){const txt=line.slice(4);
+                      return(<div key={li} style={{display:"flex",alignItems:"center",minHeight:sty.lineHeight,cursor:"pointer"}} onClick={()=>toggleInlineCheckbox(li)}>
+                        <span style={{width:22,flexShrink:0,textAlign:"center",fontSize:16,color:isChecked?"#43e97b":"rgba(102,126,234,.5)"}}>{isChecked?"☑":"☐"}</span>
+                        <span style={{color:isChecked?"rgba(232,224,240,.3)":"#e8e0f0",textDecoration:isChecked?"line-through":"none"}}>{txt||" "}</span>
+                      </div>);}
+                    return <div key={li} style={{minHeight:sty.lineHeight}}>{line||"\u00A0"}</div>;
+                  })}
+                </div>);
+              })()}
+              {/* Normal textarea (hidden when checklist view is active) */}
+              {!checklistView&&<textarea ref={(el)=>{if(el){
                 const curIdx=String(pageIdxRef.current);
                 if(el.dataset.loadedIdx!==curIdx){
                   const d=readNb();const content=d.pages?.[pageIdxRef.current]?.content||"";
                   textRef.current=content;el.value=content;el.dataset.loadedIdx=curIdx;
                 }
                 textareaRef.current=el;}}
-              } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type),position:"relative",zIndex:1}}/>
-            </div>}
-            {!pageDrawMode&&page.type==="checklist"&&<div style={{padding:"10px 14px",minHeight:800}}>
-              {/* Add item input */}
-              <div style={{display:"flex",gap:6,marginBottom:12}}>
-                <input value={clNewItem} onChange={e=>setClNewItem(e.target.value)}
-                  onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addChecklistItem();}}}
-                  placeholder="Add item..." style={{flex:1,padding:"10px 12px",borderRadius:10,border:"1px solid rgba(102,126,234,.2)",background:"rgba(102,126,234,.06)",color:"#e8e0f0",fontSize:15,outline:"none",fontFamily:"'Nunito',sans-serif"}}/>
-                <button onClick={addChecklistItem} style={{padding:"8px 14px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:18,fontWeight:700,cursor:"pointer",lineHeight:1}}>+</button>
-              </div>
-              {/* Checklist items */}
-              {(()=>{const items=getChecklist();const unchecked=items.filter(it=>!it.done);const checked=items.filter(it=>it.done);return(<>
-                {unchecked.length===0&&checked.length===0&&<div style={{textAlign:"center",opacity:.25,padding:30,fontSize:14}}>Add items to your checklist</div>}
-                {unchecked.map((item)=>(<div key={item.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 4px",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
-                  <button onClick={()=>toggleChecklistItem(item.id)} style={{width:24,height:24,borderRadius:6,border:"2px solid rgba(102,126,234,.4)",background:"transparent",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"transparent",padding:0}}>✓</button>
-                  {clEditId===item.id?<input autoFocus value={clEditText} onChange={e=>setClEditText(e.target.value)} onBlur={commitEditCl} onKeyDown={e=>{if(e.key==="Enter")commitEditCl();if(e.key==="Escape")setClEditId(null);}}
-                    style={{flex:1,padding:"4px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.3)",background:"rgba(102,126,234,.08)",color:"#e8e0f0",fontSize:15,outline:"none",fontFamily:"'Nunito',sans-serif"}}/>
-                  :<span onClick={()=>startEditCl(item)} style={{flex:1,fontSize:15,color:"#e8e0f0",cursor:"text",wordBreak:"break-word"}}>{item.text}</span>}
-                  <div style={{display:"flex",gap:2,flexShrink:0}}>
-                    <button onClick={()=>moveChecklistItem(item.id,-1)} style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",fontSize:12,cursor:"pointer",padding:"2px 4px"}}>▲</button>
-                    <button onClick={()=>moveChecklistItem(item.id,1)} style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",fontSize:12,cursor:"pointer",padding:"2px 4px"}}>▼</button>
-                    <button onClick={()=>deleteChecklistItem(item.id)} style={{background:"none",border:"none",color:"rgba(245,87,108,.4)",fontSize:14,cursor:"pointer",padding:"2px 4px"}}>×</button>
-                  </div>
-                </div>))}
-                {checked.length>0&&<div style={{marginTop:12,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-                  <div style={{fontSize:11,opacity:.3,marginBottom:6,fontWeight:700}}>COMPLETED ({checked.length})</div>
-                  {checked.map((item)=>(<div key={item.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:"1px solid rgba(255,255,255,.02)"}}>
-                    <button onClick={()=>toggleChecklistItem(item.id)} style={{width:24,height:24,borderRadius:6,border:"2px solid rgba(67,233,123,.3)",background:"rgba(67,233,123,.1)",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#43e97b",padding:0}}>✓</button>
-                    <span style={{flex:1,fontSize:15,color:"rgba(232,224,240,.35)",textDecoration:"line-through",wordBreak:"break-word"}}>{item.text}</span>
-                    <button onClick={()=>deleteChecklistItem(item.id)} style={{background:"none",border:"none",color:"rgba(245,87,108,.3)",fontSize:14,cursor:"pointer",padding:"2px 4px"}}>×</button>
-                  </div>))}
-                </div>}
-              </>);})()}
+              } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type),position:"relative",zIndex:1}}/>}
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}}>
               {(()=>{const baseTs=ts(page.type);const scaledPadding=(()=>{
@@ -8913,7 +8919,7 @@ const NotebookPanel=()=>{
     <div style={{background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
       <input value={nbNewTitle} onChange={e=>setNbNewTitle(e.target.value)} placeholder="Page title" style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none",marginBottom:6}}/>
       <div style={{display:"flex",gap:4,marginBottom:6}}>
-        {[{id:"lined",label:"📝 Lined"},{id:"checklist",label:"☑️ List"},{id:"blank",label:"📄 Blank"},{id:"square",label:"🔲 Grid"},{id:"hex",label:"⬡ Hex"},{id:"pixel",label:"🟨 Pixel"}].map(t=>(
+        {[{id:"lined",label:"📝 Lined"},{id:"blank",label:"📄 Blank"},{id:"square",label:"🔲 Grid"},{id:"hex",label:"⬡ Hex"},{id:"pixel",label:"🟨 Pixel"}].map(t=>(
           <button key={t.id} onClick={()=>setNbNewType(t.id)}
             style={{flex:1,padding:"7px 2px",borderRadius:8,border:nbNewType===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.08)",
               background:nbNewType===t.id?"rgba(102,126,234,.15)":"rgba(255,255,255,.03)",color:nbNewType===t.id?"#a8b4f0":"#888",fontSize:11,fontWeight:700,cursor:"pointer"}}>{t.label}</button>))}
@@ -8926,7 +8932,7 @@ const NotebookPanel=()=>{
               background:nbPixelSize===s.id?"rgba(254,202,87,.12)":"rgba(255,255,255,.03)",color:nbPixelSize===s.id?"#feca57":"#888",fontSize:10,fontWeight:700,cursor:"pointer"}}>{s.label}<div style={{fontSize:9,opacity:.5}}>{s.desc}</div></button>))}
         </div></div>}
       <button onClick={()=>{const title=nbNewTitle.trim()||`Page ${nbData.pages.length+1}`;
-        const np={title,type:nbNewType,content:"",drawData:null,pixels:{},created:Date.now(),checklist:[]};
+        const np={title,type:nbNewType,content:"",drawData:null,pixels:{},created:Date.now()};
         if(nbNewType==="pixel")np.pixelSize=nbPixelSize;
         const d=readNb();d.pages.push(np);saveNb(d);setNbNewTitle("");
         const newIdx=d.pages.length-1;pageIdxRef.current=newIdx;
@@ -8942,14 +8948,13 @@ const NotebookPanel=()=>{
           <span style={{fontSize:13,fontWeight:800,color:"rgba(102,126,234,.6)",minWidth:28}}>{i+1}.</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title||"Untitled"}</div>
-            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):p.type==="checklist"?`☑️ ${(p.checklist||[]).filter(x=>x.done).length}/${(p.checklist||[]).length} done`:`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
+            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
           <span style={{fontSize:14,opacity:.3,transition:"transform .2s",transform:isExpanded?"rotate(90deg)":"none"}}>▶</span>
         </div>
         {isExpanded&&<div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)"}}>
           {/* Preview */}
-          {p.type!=="pixel"&&p.type!=="checklist"&&p.content&&<div style={{fontSize:13,color:"rgba(232,224,240,.5)",lineHeight:1.5,marginBottom:8,maxHeight:60,overflow:"hidden",whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{p.content.slice(0,150)}{p.content.length>150?"…":""}</div>}
-          {p.type!=="pixel"&&p.type!=="checklist"&&!p.content&&!p.drawData&&<div style={{fontSize:12,opacity:.25,marginBottom:8,fontStyle:"italic"}}>Empty page</div>}
-          {p.type==="checklist"&&<div style={{marginBottom:8}}>{(p.checklist||[]).slice(0,5).map((it,j)=>(<div key={j} style={{fontSize:13,color:it.done?"rgba(232,224,240,.3)":"rgba(232,224,240,.5)",textDecoration:it.done?"line-through":"none",lineHeight:1.6}}>{it.done?"☑":"☐"} {it.text}</div>))}{(p.checklist||[]).length>5&&<div style={{fontSize:11,opacity:.25}}>+{(p.checklist||[]).length-5} more</div>}{(p.checklist||[]).length===0&&<div style={{fontSize:12,opacity:.25,fontStyle:"italic"}}>Empty checklist</div>}</div>}
+          {p.type!=="pixel"&&p.content&&<div style={{fontSize:13,color:"rgba(232,224,240,.5)",lineHeight:1.5,marginBottom:8,maxHeight:60,overflow:"hidden",whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{p.content.slice(0,150)}{p.content.length>150?"…":""}</div>}
+          {p.type!=="pixel"&&!p.content&&!p.drawData&&<div style={{fontSize:12,opacity:.25,marginBottom:8,fontStyle:"italic"}}>Empty page</div>}
           {p.type==="pixel"&&<div style={{fontSize:12,opacity:.35,marginBottom:8}}>{Object.keys(p.pixels||{}).length} pixels drawn · {p.pixelSize||"32x32"}</div>}
           {p.drawData&&<img src={p.drawData} style={{width:"100%",maxHeight:80,objectFit:"contain",borderRadius:6,border:"1px solid rgba(255,255,255,.06)",marginBottom:8,opacity:.6}}/>}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
