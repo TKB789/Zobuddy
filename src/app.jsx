@@ -6104,17 +6104,19 @@ const NotebookPanel=()=>{
   const getColorNum=(hex)=>{if(!hex)return"";const h=hex.toLowerCase();const p=PIXEL_PALETTE.find(p=>p.c===h);return p?String(p.n):(pixCustomLabels[h]||"");};
   const drawPixelGrid=()=>{const c=pixCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const dims=getPixelDims();const cs=getPixelCellSize();const pixels=getPixels();
-    // Always leave 1px gap — background color IS the grid
-    ctx.fillStyle="#444";ctx.fillRect(0,0,c.width,c.height);
-    // Section borders: black strips (before pixels so pixels don't cover them)
-    if(pixelGridLines>0){ctx.fillStyle="#000";const sw=cs>=8?2:1;
-      for(let x=pixelGridLines;x<dims.c;x+=pixelGridLines)for(let y=0;y<dims.r;y++)ctx.fillRect(x*cs-sw,y*cs,sw*2+1,cs);
-      for(let y=pixelGridLines;y<dims.r;y+=pixelGridLines)for(let x=0;x<dims.c;x++)ctx.fillRect(x*cs,y*cs-sw,cs,sw*2+1);}
-    // Draw all cells — pixels get their color, empty cells get dark bg
-    for(let r=0;r<dims.r;r++)for(let cl=0;cl<dims.c;cl++){
-      const key=`${r}-${cl}`;const color=pixels[key];
-      ctx.fillStyle=color||"#181818";
-      ctx.fillRect(cl*cs+1,r*cs+1,cs-2,cs-2);}
+    // White background like cross-stitch paper
+    ctx.fillStyle="#f8f8f8";ctx.fillRect(0,0,c.width,c.height);
+    // Thin gray cell grid lines
+    ctx.fillStyle="#ddd";
+    for(let x=0;x<=dims.c;x++)ctx.fillRect(x*cs,0,1,dims.r*cs);
+    for(let y=0;y<=dims.r;y++)ctx.fillRect(0,y*cs,dims.c*cs,1);
+    // Section borders — dark thick lines
+    if(pixelGridLines>0){ctx.fillStyle="#333";
+      for(let x=0;x<=dims.c;x+=pixelGridLines)ctx.fillRect(x*cs,0,1,dims.r*cs);
+      for(let y=0;y<=dims.r;y+=pixelGridLines)ctx.fillRect(0,y*cs,dims.c*cs,1);}
+    // Draw pixels on top — fill cell minus 1px for grid line
+    Object.entries(pixels).forEach(([key,color])=>{const[r,cl]=key.split("-").map(Number);
+      if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs+1,r*cs+1,cs-1,cs-1);}});
     // Number overlay
     if(showPixNumbers&&cs>=8){ctx.textAlign="center";ctx.textBaseline="middle";
       const fs=Math.max(5,Math.min(cs-3,11));ctx.font=`bold ${fs}px sans-serif`;
@@ -6186,26 +6188,25 @@ const NotebookPanel=()=>{
     // Two+ fingers = pinch zoom — cancel painting
     if(e.touches&&e.touches.length>1){
       pixIsPainting.current=false;pixCancelled.current=true;
-      const t1=e.touches[0],t2=e.touches[1];
-      const dist=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
-      if(pixPinchDist.current!==null){
-        const scale=dist/pixPinchDist.current;
-        if(Math.abs(scale-1)>0.02)setPageZoom(z=>Math.max(0.3,Math.min(8,z*scale)));
-      }
-      pixPinchDist.current=dist;
-      e.preventDefault();return;
+      // Let browser handle two-finger pan/scroll natively
+      return;
     }
     pixPinchDist.current=null;
     const t=e.touches?e.touches[0]:e;
     if(isStart){
       pixIsPainting.current=true;pixCancelled.current=false;
-      e.preventDefault();paintPixAt(t);
+      // Don't preventDefault on touch start — allow browser to determine if it's a scroll
+      if(!e.touches){e.preventDefault();paintPixAt(t);} // mouse only
       return;
     }
     if(!pixIsPainting.current||pixCancelled.current)return;
     e.preventDefault();paintPixAt(t);
   };
   const handlePixEnd=(e)=>{
+    // On touch end, if we never moved (single tap), paint that pixel
+    if(pixIsPainting.current&&!pixCancelled.current&&e.changedTouches){
+      const t=e.changedTouches[0];paintPixAt(t);
+    }
     pixPinchDist.current=null;
     pixIsPainting.current=false;pixCancelled.current=false;
   };
