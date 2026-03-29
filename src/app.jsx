@@ -6183,17 +6183,42 @@ const NotebookPanel=()=>{
     drawPixelGrid();};
   const pixColorRef=React.useRef(pixelColor);pixColorRef.current=pixelColor;
   const pixEraserRef=React.useRef(pixelEraser);pixEraserRef.current=pixelEraser;
-  const handlePixEvent=(e,isStart)=>{if(e.touches&&e.touches.length>1)return;
-    if(isStart)e.preventDefault();else if(!pixIsPainting.current)return;else e.preventDefault();
-    if(isStart)pixIsPainting.current=true;const c=pixCanvasRef.current;if(!c)return;
-    const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;const t=e.touches?e.touches[0]:e;
+  const pixStartPos=React.useRef(null);const pixMoved=React.useRef(false);const pixCancelled=React.useRef(false);
+  const handlePixEvent=(e,isStart)=>{
+    // Two+ fingers = gesture (pinch/zoom/scroll) — cancel any painting
+    if(e.touches&&e.touches.length>1){pixIsPainting.current=false;pixStartPos.current=null;pixCancelled.current=true;return;}
+    const t=e.touches?e.touches[0]:e;
+    if(isStart){
+      pixStartPos.current={x:t.clientX,y:t.clientY};pixMoved.current=false;pixIsPainting.current=true;pixCancelled.current=false;
+      if(!e.touches){e.preventDefault();paintPixAt(t);} // mouse: paint immediately
+      return;
+    }
+    if(!pixIsPainting.current||pixCancelled.current)return;
+    // Check if finger moved far enough to be a scroll
+    if(e.touches&&pixStartPos.current){
+      const dx=Math.abs(t.clientX-pixStartPos.current.x),dy=Math.abs(t.clientY-pixStartPos.current.y);
+      if(dx>8||dy>8){pixIsPainting.current=false;pixStartPos.current=null;return;}
+    }
+    e.preventDefault();paintPixAt(t);pixMoved.current=true;
+  };
+  const handlePixEnd=(e)=>{
+    // Only paint on tap if: single finger, didn't move, wasn't cancelled by gesture
+    if(pixIsPainting.current&&!pixMoved.current&&!pixCancelled.current&&pixStartPos.current&&e.changedTouches){
+      const t=e.changedTouches[0];e.preventDefault();paintPixAt(t);
+    }
+    pixIsPainting.current=false;pixStartPos.current=null;pixCancelled.current=false;
+  };
+  const paintPixAt=(t)=>{
+    const c=pixCanvasRef.current;if(!c)return;
+    const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;
     const dims=getPixelDims();const cs=getPixelCellSize();
     const col=Math.floor(((t.clientX-r.left)*sx)/cs);const row=Math.floor(((t.clientY-r.top)*sy)/cs);
-    if(row>=0&&row<dims.r&&col>=0&&col<dims.c)setPixel(row,col,pixColorRef.current,pixEraserRef.current);};
+    if(row>=0&&row<dims.r&&col>=0&&col<dims.c)setPixel(row,col,pixColorRef.current,pixEraserRef.current);
+  };
   const pixCanvasCallbackRef=React.useCallback((node)=>{if(node){pixCanvasRef.current=node;
     node.addEventListener("touchstart",(e)=>handlePixEvent(e,true),{passive:false});
     node.addEventListener("touchmove",(e)=>handlePixEvent(e,false),{passive:false});
-    node.addEventListener("touchend",()=>{pixIsPainting.current=false;});
+    node.addEventListener("touchend",(e)=>handlePixEnd(e));
     node.addEventListener("mousedown",(e)=>handlePixEvent(e,true));node.addEventListener("mousemove",(e)=>handlePixEvent(e,false));
     node.addEventListener("mouseup",()=>{pixIsPainting.current=false;});node.addEventListener("mouseleave",()=>{pixIsPainting.current=false;});
     setTimeout(drawPixelGrid,50);}},[nbPageIdx]);
