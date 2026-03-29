@@ -6210,10 +6210,10 @@ const NotebookPanel=()=>{
         <button onClick={redoPixel} style={btn({color:"#aaa"})}>↪</button>
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
             <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
-            {renaming?<div style={{display:"flex",gap:4,alignItems:"center"}}><input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
-              style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:100}}/>
-              <button onClick={doRename} style={{background:"none",border:"none",color:"#43e97b",fontSize:13,cursor:"pointer",fontWeight:700}}>✓</button>
-              <button onClick={()=>setRenaming(false)} style={{background:"none",border:"none",color:"#888",fontSize:13,cursor:"pointer"}}>✕</button></div>
+            {renaming?<input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
+              onBlur={()=>{if(renameVal.trim()){save("title",renameVal.trim());syncState();}setRenaming(false);}}
+              onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
+              style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:120}}/>
             :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
             <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
           </div>
@@ -6248,10 +6248,10 @@ const NotebookPanel=()=>{
         {pageDrawMode&&<><button onClick={undoDraw} style={btn({color:"#aaa"})}>↩</button><button onClick={redoDraw} style={btn({color:"#aaa"})}>↪</button></>}
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
           <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
-          {renaming?<div style={{display:"flex",gap:4,alignItems:"center"}}><input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
-            style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:100}}/>
-            <button onClick={doRename} style={{background:"none",border:"none",color:"#43e97b",fontSize:13,cursor:"pointer",fontWeight:700}}>✓</button>
-            <button onClick={()=>setRenaming(false)} style={{background:"none",border:"none",color:"#888",fontSize:13,cursor:"pointer"}}>✕</button></div>
+          {renaming?<input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
+              onBlur={()=>{if(renameVal.trim()){save("title",renameVal.trim());syncState();}setRenaming(false);}}
+              onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
+              style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:120}}/>
           :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
           <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
@@ -6476,8 +6476,8 @@ const LearnPanel=()=>{
           <span style={{fontSize:20}}>{icon}</span>
           <div style={{flex:1,minWidth:0}}><div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{title}</div></div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-          {onFav&&<button onClick={e=>{e.stopPropagation();onFav();}} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",padding:"2px 4px",opacity:isFav?1:.3}}>{isFav?"⭐":"☆"}</button>}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          {onFav&&<button onClick={e=>{e.stopPropagation();onFav();}} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",padding:"6px 8px",margin:"-6px 0",opacity:isFav?1:.3}}>{isFav?"⭐":"☆"}</button>}
           {link?<span style={{fontSize:14,opacity:.3}}>↗</span>:<span style={{fontSize:14,opacity:.3}}>{expanded===id?"▲":"▼"}</span>}
         </div>
       </div>
