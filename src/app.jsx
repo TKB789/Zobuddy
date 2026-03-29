@@ -6104,18 +6104,19 @@ const NotebookPanel=()=>{
   const getColorNum=(hex)=>{if(!hex)return"";const h=hex.toLowerCase();const p=PIXEL_PALETTE.find(p=>p.c===h);return p?String(p.n):(pixCustomLabels[h]||"");};
   const drawPixelGrid=()=>{const c=pixCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const dims=getPixelDims();const cs=getPixelCellSize();const pixels=getPixels();
-    ctx.fillStyle="#111";ctx.fillRect(0,0,c.width,c.height);
-    // Draw pixels inset so grid lines show cleanly between them
-    const inset=cs>=6?1:0;
-    Object.entries(pixels).forEach(([key,color])=>{const[r,cl]=key.split("-").map(Number);if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs+inset,r*cs+inset,cs-inset*2,cs-inset*2);}});
-    // Grid lines in the gaps
-    if(cs>=4){ctx.fillStyle="rgba(255,255,255,.15)";
-      for(let x=0;x<=dims.c;x++)ctx.fillRect(x*cs,0,1,dims.r*cs);
-      for(let y=0;y<=dims.r;y++)ctx.fillRect(0,y*cs,dims.c*cs,1);}
-    // Section borders
-    if(pixelGridLines>0){ctx.fillStyle="rgba(255,255,255,.45)";
-      for(let x=0;x<=dims.c;x+=pixelGridLines)ctx.fillRect(x*cs,0,1,dims.r*cs);
-      for(let y=0;y<=dims.r;y+=pixelGridLines)ctx.fillRect(0,y*cs,dims.c*cs,1);}
+    // Background = cell gap color (dark gray)
+    ctx.fillStyle="#333";ctx.fillRect(0,0,c.width,c.height);
+    // Section borders: draw black strips first (wider gap)
+    if(pixelGridLines>0){ctx.fillStyle="#000";
+      for(let x=0;x<=dims.c;x+=pixelGridLines)ctx.fillRect(x*cs-1,0,3,dims.r*cs);
+      for(let y=0;y<=dims.r;y+=pixelGridLines)ctx.fillRect(0,y*cs-1,dims.c*cs,3);}
+    // Draw pixels with 1px gap (the gray background shows through as the grid)
+    const gap=cs>=6?1:0;
+    Object.entries(pixels).forEach(([key,color])=>{const[r,cl]=key.split("-").map(Number);
+      if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs+gap,r*cs+gap,cs-gap*2,cs-gap*2);}});
+    // Empty cells: fill with dark background so they don't show as gray
+    for(let r=0;r<dims.r;r++)for(let cl=0;cl<dims.c;cl++){
+      const key=`${r}-${cl}`;if(!pixels[key]){ctx.fillStyle="#111";ctx.fillRect(cl*cs+gap,r*cs+gap,cs-gap*2,cs-gap*2);}}
     // Number overlay
     if(showPixNumbers&&cs>=8){ctx.textAlign="center";ctx.textBaseline="middle";
       const fs=Math.max(5,Math.min(cs-3,11));ctx.font=`bold ${fs}px sans-serif`;
