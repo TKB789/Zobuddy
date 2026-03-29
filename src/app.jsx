@@ -6065,16 +6065,26 @@ const NotebookPanel=()=>{
   const pixCanvasRef=React.useRef(null);const pixIsPainting=React.useRef(false);const pixelUndoRef=React.useRef([]);const pixelRedoRef=React.useRef([]);
   const PIXEL_COLORS=["#f5576c","#feca57","#43e97b","#60a5fa","#f093fb","#fb923c","#22d3ee","#fff","#888","#333"];
   const PIXEL_SIZES=[{id:"16x16",label:"16×16",desc:"Icon",c:16,r:16},{id:"32x32",label:"32×32",desc:"Sprite",c:32,r:32},{id:"48x48",label:"48×48",desc:"Detailed",c:48,r:48},{id:"64x64",label:"64×64",desc:"Large",c:64,r:64},{id:"128x128",label:"128×128",desc:"HD",c:128,r:128},{id:"256x256",label:"256×256",desc:"Full",c:256,r:256}];
+  const[pixelGridLines,setPixelGridLines]=useState(0); // 0=off, 5=5x5, 10=10x10, 20=20x20
   const getPixels=()=>{const d=readNb();return d.pages?.[nbPageIdx]?.pixels||{};};
   const getPixelDims=()=>{const d=readNb();const page=d.pages?.[nbPageIdx];return PIXEL_SIZES.find(s=>s.id===(page?.pixelSize||"32x32"))||PIXEL_SIZES[1];};
   const getPixelCellSize=()=>{const dims=getPixelDims();return Math.max(4,Math.min(20,Math.floor(400/dims.c)));};
   const drawPixelGrid=()=>{const c=pixCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const dims=getPixelDims();const cs=getPixelCellSize();const pixels=getPixels();
     ctx.fillStyle="#111";ctx.fillRect(0,0,c.width,c.height);
+    // Fine grid lines
     ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;
     for(let x=0;x<=dims.c;x++){ctx.beginPath();ctx.moveTo(x*cs,0);ctx.lineTo(x*cs,dims.r*cs);ctx.stroke();}
     for(let y=0;y<=dims.r;y++){ctx.beginPath();ctx.moveTo(0,y*cs);ctx.lineTo(dims.c*cs,y*cs);ctx.stroke();}
-    Object.entries(pixels).forEach(([key,color])=>{const[r,cl]=key.split("-").map(Number);if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs,r*cs,cs,cs);}});};
+    // Draw pixels
+    Object.entries(pixels).forEach(([key,color])=>{const[r,cl]=key.split("-").map(Number);if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs,r*cs,cs,cs);}});
+    // Section borders (10x10, 5x5, etc.)
+    if(pixelGridLines>0){
+      ctx.strokeStyle="rgba(255,255,255,.25)";ctx.lineWidth=1.5;
+      for(let x=0;x<=dims.c;x+=pixelGridLines){ctx.beginPath();ctx.moveTo(x*cs,0);ctx.lineTo(x*cs,dims.r*cs);ctx.stroke();}
+      for(let y=0;y<=dims.r;y+=pixelGridLines){ctx.beginPath();ctx.moveTo(0,y*cs);ctx.lineTo(dims.c*cs,y*cs);ctx.stroke();}
+    }
+  };
   const setPixel=(row,col,color,erase)=>{const dims=getPixelDims();if(row<0||row>=dims.r||col<0||col>=dims.c)return;
     const key=`${row}-${col}`;const d=readNb();if(!d.pages?.[nbPageIdx])return;
     const pixels=d.pages[nbPageIdx].pixels||{};const old=pixels[key]||null;
@@ -6117,6 +6127,9 @@ const NotebookPanel=()=>{
     node.addEventListener("mousedown",(e)=>handlePixEvent(e,true));node.addEventListener("mousemove",(e)=>handlePixEvent(e,false));
     node.addEventListener("mouseup",()=>{pixIsPainting.current=false;});node.addEventListener("mouseleave",()=>{pixIsPainting.current=false;});
     setTimeout(drawPixelGrid,50);}},[nbPageIdx]);
+
+  // Redraw when grid section lines change
+  useEffect(()=>{if(nbView==="page"&&nbData.pages?.[nbPageIdx]?.type==="pixel")drawPixelGrid();},[pixelGridLines]);
 
   // ─── PAGE CHANGE ────────────────────────────────────────────────
   useEffect(()=>{
@@ -6231,9 +6244,14 @@ const NotebookPanel=()=>{
         <button onClick={()=>{if(!confirm("Clear all?"))return;const d=readNb();if(d.pages?.[nbPageIdx]){d.pages[nbPageIdx].pixels={};writeNb(d);drawPixelGrid();}}}
           style={btn({background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:11,padding:"4px 10px"})}>Clear</button>
       </div>
+      <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0}}>
+        <span style={{fontSize:10,opacity:.3,fontWeight:700}}>Grid:</span>
+        {[{v:0,l:"Off"},{v:5,l:"5×5"},{v:10,l:"10×10"},{v:20,l:"20×20"}].map(g=>(
+          <button key={g.v} onClick={()=>setPixelGridLines(g.v)} style={{padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:700,border:pixelGridLines===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:pixelGridLines===g.v?"rgba(254,202,87,.12)":"transparent",color:pixelGridLines===g.v?"#feca57":"#666",cursor:"pointer"}}>{g.l}</button>))}
+      </div>
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
         <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
-          <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"pan-x pan-y",cursor:"crosshair",display:"block"}}/>
+          <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"pan-x pan-y",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
         </div></div></div>);
   }
 
