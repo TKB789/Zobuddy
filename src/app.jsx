@@ -6072,17 +6072,17 @@ const NotebookPanel=()=>{
   const drawPixelGrid=()=>{const c=pixCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const dims=getPixelDims();const cs=getPixelCellSize();const pixels=getPixels();
     ctx.fillStyle="#111";ctx.fillRect(0,0,c.width,c.height);
-    // Fine grid lines
-    ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;
-    for(let x=0;x<=dims.c;x++){ctx.beginPath();ctx.moveTo(x*cs,0);ctx.lineTo(x*cs,dims.r*cs);ctx.stroke();}
-    for(let y=0;y<=dims.r;y++){ctx.beginPath();ctx.moveTo(0,y*cs);ctx.lineTo(dims.c*cs,y*cs);ctx.stroke();}
+    // Fine grid lines — drawn as 1px filled rects for crisp rendering when zoomed
+    ctx.fillStyle="rgba(255,255,255,.08)";
+    for(let x=0;x<=dims.c;x++)ctx.fillRect(x*cs,0,1,dims.r*cs);
+    for(let y=0;y<=dims.r;y++)ctx.fillRect(0,y*cs,dims.c*cs,1);
     // Draw pixels
     Object.entries(pixels).forEach(([key,color])=>{const[r,cl]=key.split("-").map(Number);if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs,r*cs,cs,cs);}});
     // Section borders (10x10, 5x5, etc.)
     if(pixelGridLines>0){
-      ctx.strokeStyle="rgba(255,255,255,.25)";ctx.lineWidth=1.5;
-      for(let x=0;x<=dims.c;x+=pixelGridLines){ctx.beginPath();ctx.moveTo(x*cs,0);ctx.lineTo(x*cs,dims.r*cs);ctx.stroke();}
-      for(let y=0;y<=dims.r;y+=pixelGridLines){ctx.beginPath();ctx.moveTo(0,y*cs);ctx.lineTo(dims.c*cs,y*cs);ctx.stroke();}
+      ctx.fillStyle="rgba(255,255,255,.3)";
+      for(let x=0;x<=dims.c;x+=pixelGridLines)ctx.fillRect(x*cs,0,1,dims.r*cs);
+      for(let y=0;y<=dims.r;y+=pixelGridLines)ctx.fillRect(0,y*cs,dims.c*cs,1);
     }
   };
   const setPixel=(row,col,color,erase)=>{const dims=getPixelDims();if(row<0||row>=dims.r||col<0||col>=dims.c)return;
@@ -6095,7 +6095,7 @@ const NotebookPanel=()=>{
     d.pages[nbPageIdx].pixels=pixels;writeNb(d);
     const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();
       ctx.fillStyle=pixels[key]||"#111";ctx.fillRect(col*cs,row*cs,cs,cs);
-      ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;ctx.strokeRect(col*cs,row*cs,cs,cs);}};
+      ctx.fillStyle="rgba(255,255,255,.08)";ctx.fillRect(col*cs,row*cs,1,cs);ctx.fillRect(col*cs,row*cs,cs,1);ctx.fillRect((col+1)*cs,row*cs,1,cs);ctx.fillRect(col*cs,(row+1)*cs,cs,1);}};
   const undoPixel=()=>{if(!pixelUndoRef.current.length)return;const entry=pixelUndoRef.current.pop();
     const{key,old}=entry;
     const d=readNb();if(!d.pages?.[nbPageIdx])return;const pixels=d.pages[nbPageIdx].pixels||{};
@@ -6103,14 +6103,14 @@ const NotebookPanel=()=>{
     if(old)pixels[key]=old;else delete pixels[key];d.pages[nbPageIdx].pixels=pixels;writeNb(d);
     pixelRedoRef.current.push({key,old:cur,newVal:old});
     const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();const[r,cl]=key.split("-").map(Number);
-      ctx.fillStyle=old||"#111";ctx.fillRect(cl*cs,r*cs,cs,cs);ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;ctx.strokeRect(cl*cs,r*cs,cs,cs);}};
+      ctx.fillStyle=old||"#111";ctx.fillRect(cl*cs,r*cs,cs,cs);ctx.fillStyle="rgba(255,255,255,.08)";ctx.fillRect(cl*cs,r*cs,1,cs);ctx.fillRect(cl*cs,r*cs,cs,1);ctx.fillRect((cl+1)*cs,r*cs,1,cs);ctx.fillRect(cl*cs,(r+1)*cs,cs,1);}};
   const redoPixel=()=>{if(!pixelRedoRef.current.length)return;const entry=pixelRedoRef.current.pop();
     const{key,old,newVal}=entry;
     const d=readNb();if(!d.pages?.[nbPageIdx])return;const pixels=d.pages[nbPageIdx].pixels||{};
     if(newVal)pixels[key]=newVal;else delete pixels[key];d.pages[nbPageIdx].pixels=pixels;writeNb(d);
     pixelUndoRef.current.push({key,old,newVal});
     const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();const[r,cl]=key.split("-").map(Number);
-      ctx.fillStyle=newVal||"#111";ctx.fillRect(cl*cs,r*cs,cs,cs);ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=0.5;ctx.strokeRect(cl*cs,r*cs,cs,cs);}};;
+      ctx.fillStyle=newVal||"#111";ctx.fillRect(cl*cs,r*cs,cs,cs);ctx.fillStyle="rgba(255,255,255,.08)";ctx.fillRect(cl*cs,r*cs,1,cs);ctx.fillRect(cl*cs,r*cs,cs,1);ctx.fillRect((cl+1)*cs,r*cs,1,cs);ctx.fillRect(cl*cs,(r+1)*cs,cs,1);}};;
   const pixColorRef=React.useRef(pixelColor);pixColorRef.current=pixelColor;
   const pixEraserRef=React.useRef(pixelEraser);pixEraserRef.current=pixelEraser;
   const handlePixEvent=(e,isStart)=>{if(e.touches&&e.touches.length>1)return;
