@@ -6224,25 +6224,25 @@ const NotebookPanel=()=>{
       }catch(err){alert("Error: "+err.message);setPixImporting(false);setPixImgCrop(null);}
     };img.src=imgSrc;
   };
-  // Direct import — use persistent input ref to avoid GC on mobile
+  // All imports go through crop UI
   const pixFileInputRef=React.useRef(null);
   const pixImportCallbackRef=React.useRef(null);
-  const importDirect=(fullColor)=>{
-    pixImportCallbackRef.current=(file)=>{
-      const reader=new FileReader();
-      reader.onerror=()=>alert("FileReader error");
-      reader.onload=(ev)=>{if(ev.target.result)_pixImgConvert(ev.target.result,fullColor,null);};
-      reader.readAsDataURL(file);
-    };
-    if(pixFileInputRef.current)pixFileInputRef.current.click();
-  };
-  // Crop import — pick file, show crop UI, then convert
-  const importWithCrop=(fullColor)=>{
+  const importImage=(fullColor)=>{
     pixImportCallbackRef.current=(file)=>{
       pixImgModeRef.current=fullColor;
       const reader=new FileReader();reader.onload=(ev)=>{
         pixImgSrcRef.current=ev.target.result;
-        setPixImgCrop({src:ev.target.result});setPixCropBox({x:0,y:0,w:100,h:100});
+        // Initialize crop box matching grid aspect ratio, centered
+        const dims=getPixelDims();const gridRatio=dims.c/dims.r;
+        const img=new Image();img.onload=()=>{
+          const imgRatio=img.width/img.height;
+          let cw,ch;
+          if(gridRatio>=imgRatio){cw=100;ch=Math.min(100,(cw/gridRatio)*(imgRatio));}
+          else{ch=100;cw=Math.min(100,(ch*gridRatio)/(imgRatio));}
+          const cx=(100-cw)/2,cy=(100-ch)/2;
+          setPixCropBox({x:cx,y:cy,w:cw,h:ch});
+          setPixImgCrop({src:ev.target.result});
+        };img.src=ev.target.result;
       };reader.readAsDataURL(file);
     };
     if(pixFileInputRef.current)pixFileInputRef.current.click();
@@ -6456,12 +6456,10 @@ const NotebookPanel=()=>{
       <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
         <button onClick={()=>{if(!confirm("Clear all?"))return;const d=readNb();if(d.pages?.[nbPageIdx]){d.pages[nbPageIdx].pixels={};writeNb(d);drawPixelGrid();}}}
           style={btn({background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:10,padding:"3px 8px"})}>Clear</button>
-        <button onClick={()=>importDirect(false)} disabled={pixImporting}
+        <button onClick={()=>importImage(false)} disabled={pixImporting}
           style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:10,padding:"3px 7px"})}>{pixImporting?"...":"📷36"}</button>
-        <button onClick={()=>importDirect(true)} disabled={pixImporting}
+        <button onClick={()=>importImage(true)} disabled={pixImporting}
           style={btn({background:"rgba(240,147,251,.1)",border:"1px solid rgba(240,147,251,.2)",color:"#f093fb",fontSize:10,padding:"3px 7px"})}>{pixImporting?"...":"📷Full"}</button>
-        <button onClick={()=>importWithCrop(false)} disabled={pixImporting}
-          style={btn({background:"rgba(254,202,87,.1)",border:"1px solid rgba(254,202,87,.2)",color:"#feca57",fontSize:10,padding:"3px 7px"})}>✂️</button>
         <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
         <button onClick={()=>{setShowPixNumbers(v=>{const nv=!v;setTimeout(drawPixelGrid,10);return nv;});}} style={btn(showPixNumbers?{background:"rgba(254,202,87,.12)",border:"1px solid rgba(254,202,87,.4)",color:"#feca57",fontSize:10,padding:"3px 7px"}:{fontSize:10,padding:"3px 7px",color:"#888"})}>#</button>
         <button onClick={printPixelArt} style={btn({fontSize:10,padding:"3px 7px",color:"#888"})}>🖨️</button>
