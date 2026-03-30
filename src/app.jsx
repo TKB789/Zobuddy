@@ -1214,7 +1214,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       </div>);
   };
 
-  // ═══ MINESWEEPER (clover field, bombs) ═══
+  // ═══ LUCKY CLOVERS (clover field) ═══
   const Minesweeper=()=>{
     const ROWS=10,COLS=8,MINES=10;
     const[board,setBoard]=useState(null);const[revealed,setRevealed]=useState(null);const[flagged,setFlagged]=useState(null);
@@ -1231,7 +1231,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     useEffect(()=>{if(!startTime||gameOver||won)return;const iv=setInterval(()=>setElapsed(Math.floor((Date.now()-startTime)/1000)),1000);return()=>clearInterval(iv);},[startTime,gameOver,won]);
     const[firstClick,setFirstClick]=useState(true);
     const reveal=(r,c)=>{if(!board||gameOver||won||revealed[r][c]||flagged[r][c])return;
-      // First click protection - if it's a bomb, move it elsewhere
+      // First click protection - if it's mud, move it elsewhere
       if(firstClick){setFirstClick(false);
         if(board[r][c]===-1){const b=board.map(row=>[...row]);b[r][c]=0;
           let placed=false;for(let i=0;i<ROWS&&!placed;i++)for(let j=0;j<COLS&&!placed;j++){if(b[i][j]!==-1&&!(i===r&&j===c)){b[i][j]=-1;placed=true;}}
@@ -1260,7 +1260,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
     if(!board)return null;
     return(<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 12px",overflow:"auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",maxWidth:320,marginBottom:6}}>
-        <span style={{fontSize:14,fontWeight:800,color:"#f5576c"}}>💣 {MINES-flagCount}</span>
+        <span style={{fontSize:14,fontWeight:800,color:"#f5576c"}}>💩 {MINES-flagCount}</span>
         <span style={{fontSize:14,fontWeight:800,color:"#feca57"}}>⏱ {elapsed}s</span>
         <button onClick={()=>setFlagMode(!flagMode)} style={{background:flagMode?"rgba(245,87,108,.25)":"rgba(102,126,234,.15)",border:flagMode?"2px solid rgba(245,87,108,.5)":"2px solid rgba(102,126,234,.3)",borderRadius:10,padding:"6px 16px",fontSize:14,fontWeight:800,color:flagMode?"#f5576c":"#a8b4f0",cursor:"pointer"}}>{flagMode?"🚩 Flagging":"👆 Picking"}</button>
       </div>
@@ -1275,13 +1275,13 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
                 background:isRev?(cell===-1?"rgba(245,87,108,.15)":"rgba(0,0,0,.3)"):"linear-gradient(135deg,#1a3a1a,#224422)",
                 border:isRev?"1px solid rgba(255,255,255,.03)":"1px solid rgba(67,233,123,.15)"}}>
               {isRev
-                ?(cell===-1?<span style={{fontSize:18}}>💣</span>:cell>0?<span style={{fontSize:14,fontWeight:800,color:COLORS[cell]}}>{cell}</span>:null)
+                ?(cell===-1?<span style={{fontSize:18}}>💩</span>:cell>0?<span style={{fontSize:14,fontWeight:800,color:COLORS[cell]}}>{cell}</span>:null)
                 :(isFlag?<span style={{fontSize:18}}>🚩</span>:<span style={{fontSize:20}}>🍀</span>)}
             </div>);}))}
         </div>
         {/* Game end overlay - positioned over the grid */}
         {(gameOver||won)&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.7)",borderRadius:8}}>
-          <div style={{fontSize:28,fontWeight:900,color:won?"#43e97b":"#f5576c",textShadow:"0 2px 8px rgba(0,0,0,.5)"}}>{won?"🎉 You Win!":"💥 Boom!"}</div>
+          <div style={{fontSize:28,fontWeight:900,color:won?"#43e97b":"#f5576c",textShadow:"0 2px 8px rgba(0,0,0,.5)"}}>{won?"🌈🍀 Luck Is On Your Side! 🪙🌈":"💩 Oh Poo-Hoo! Mud all over you!"}</div>
           {won&&<div style={{fontSize:16,color:"#feca57",fontWeight:800,marginTop:4}}>Time: {elapsed}s</div>}
           {won&&best>0&&elapsed<=best&&<div style={{fontSize:13,color:"#43e97b",fontWeight:700}}>🏆 Best!</div>}
           {won&&best>0&&elapsed>best&&<div style={{fontSize:12,opacity:.5}}>Best: {best}s</div>}
@@ -1816,7 +1816,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
             {id:"bubbles",icon:"🥦",name:"Veggie Garden",desc:"Harvest veggies fast! Avoid mushrooms & poison.",color:"#43e97b",best:"zo_best_bubbles"},
             {id:"breakout",icon:"🍎",name:"Fruit Blocks",desc:"Break up the frozen fruits for a yummy dessert! 🍧",color:"#f5576c",best:"zo_best_breakout"},
             {id:"rhythm",icon:"💕",name:"Memory Matchmaker",desc:"Flip cards and pair up the animals!",color:"#feca57",best:"zo_best_memory",bestLabel:" moves"},
-            {id:"mines",icon:"🍀",name:"Lucky Clovers",desc:"Pick clovers without finding a bomb!",color:"#43e97b",best:"zo_best_mines",bestLabel:"s"},
+            {id:"mines",icon:"🍀",name:"Lucky Clovers",desc:"Pick clovers without getting 💩 on you!",color:"#43e97b",best:"zo_best_mines",bestLabel:"s"},
             {id:"lineup",icon:"🔮",name:"Zobuddy Lineup",desc:"Guess the secret lineup from clues!",color:"#a78bfa",best:"zo_best_lineup",bestLabel:" guesses"},
             {id:"nback",icon:"🧠",name:"Dual N-Back",desc:"Train your brain! Match position & letter from N steps ago.",color:"#60a5fa",best:"zo_best_nback",bestLabel:"%"},
           ].map(g=>{
