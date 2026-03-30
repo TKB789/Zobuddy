@@ -5927,8 +5927,38 @@ const DAILY_WORDS=[
 // ─── NOTEBOOK PANEL (standalone tab) ──────────────────────────────────────
 const NotebookPanel=()=>{
   const NB_KEY="zodibuddy_notebook_v1";
-  const readNb=()=>{try{return JSON.parse(localStorage.getItem(NB_KEY))||{pages:[],archive:[],pwHash:null};}catch{return{pages:[],archive:[],pwHash:null};}};
-  const writeNb=(d)=>{localStorage.setItem(NB_KEY,JSON.stringify(d));};
+  // Pixel compression: store color table + indices instead of full hex per pixel
+  const compressPixels=(pixels)=>{if(!pixels||typeof pixels!=="object")return pixels;
+    // Check if already compressed
+    if(pixels._ct)return pixels;
+    const entries=Object.entries(pixels);if(entries.length===0)return pixels;
+    // Build color table
+    const colorSet=new Set(entries.map(([,c])=>c));
+    if(colorSet.size>500)return pixels; // too many colors, don't compress (rare)
+    const ct=[...colorSet];const colorIdx={};ct.forEach((c,i)=>{colorIdx[c]=i;});
+    const pd={};entries.forEach(([k,c])=>{pd[k]=colorIdx[c];});
+    return{_ct:ct,_pd:pd};
+  };
+  const decompressPixels=(pixels)=>{if(!pixels||typeof pixels!=="object")return pixels||{};
+    if(!pixels._ct)return pixels; // not compressed
+    const ct=pixels._ct;const pd=pixels._pd||{};
+    const result={};Object.entries(pd).forEach(([k,i])=>{if(ct[i])result[k]=ct[i];});
+    return result;
+  };
+  const readNb=()=>{try{const raw=JSON.parse(localStorage.getItem(NB_KEY))||{pages:[],archive:[],pwHash:null};
+    // Decompress pixel data on read
+    if(raw.pages)raw.pages.forEach(p=>{if(p.pixels)p.pixels=decompressPixels(p.pixels);});
+    if(raw.archive)raw.archive.forEach(p=>{if(p.pixels)p.pixels=decompressPixels(p.pixels);});
+    return raw;}catch{return{pages:[],archive:[],pwHash:null};}};
+  const writeNb=(d)=>{
+    // Compress pixel data on write
+    const copy=JSON.parse(JSON.stringify(d));
+    if(copy.pages)copy.pages.forEach(p=>{if(p.pixels&&!p.pixels._ct)p.pixels=compressPixels(p.pixels);});
+    if(copy.archive)copy.archive.forEach(p=>{if(p.pixels&&!p.pixels._ct)p.pixels=compressPixels(p.pixels);});
+    localStorage.setItem(NB_KEY,JSON.stringify(copy));
+  };
+  // Storage usage helper
+  const getStorageUsage=()=>{let total=0;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);const v=localStorage.getItem(k);total+=(k.length+v.length)*2;}}catch{}return total;};
 
   const[nbData,setNbData]=useState(readNb);
   const[nbUnlocked,setNbUnlocked]=useState(false);
@@ -9076,6 +9106,22 @@ function SpiritAnimals(){
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
           <div style={{fontSize:18,fontWeight:900,color:"#e8e0f0"}}>⚙️ Settings</div>
           <button onClick={()=>{setShowSettings(false);setSearchQuery("");setSearchResults([]);}} style={{background:"rgba(255,255,255,.03)",border:`1px solid rgba(255,255,255,.06)`,borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#e8e0f0",fontSize:16}}>✕</button>
+        </div>
+
+        {/* Search */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:700,opacity:.3,marginBottom:4}}>💾 STORAGE</div>
+          {(()=>{const used=getStorageUsage();const max=5*1024*1024;const pct=Math.min(100,Math.round(used/max*100));const mb=(used/1024/1024).toFixed(1);
+            return(<div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
+                <span style={{color:"#e8e0f0",opacity:.6}}>{mb} MB / 5 MB</span>
+                <span style={{color:pct>80?"#f5576c":pct>60?"#feca57":"#43e97b",fontWeight:700}}>{pct}%</span>
+              </div>
+              <div style={{height:6,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}>
+                <div style={{height:"100%",borderRadius:3,width:`${pct}%`,background:pct>80?"#f5576c":pct>60?"#feca57":"#43e97b",transition:"width .3s"}}/>
+              </div>
+              {pct>80&&<div style={{fontSize:10,color:"#f5576c",marginTop:4}}>Storage nearly full — delete unused pixel art pages to free space</div>}
+            </div>);})()}
         </div>
 
         {/* Search */}
