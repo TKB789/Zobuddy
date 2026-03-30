@@ -6074,17 +6074,17 @@ const NotebookPanel=()=>{
   const pixCanvasRef=React.useRef(null);const pixIsPainting=React.useRef(false);const pixelUndoRef=React.useRef([]);const pixelRedoRef=React.useRef([]);
   // 36-color cross-stitch palette based on standard thread chart
   const PIXEL_PALETTE=[
-    {n:1,c:"#000000",nm:"Black"},{n:2,c:"#444444",nm:"Charcoal"},{n:3,c:"#666666",nm:"Dark Gray"},{n:4,c:"#999999",nm:"Gray"},
-    {n:5,c:"#bbbbbb",nm:"Light Gray"},{n:6,c:"#778899",nm:"Blue Gray"},{n:7,c:"#ffffff",nm:"White"},{n:8,c:"#f5f5dc",nm:"Off White"},
-    {n:9,c:"#e03030",nm:"Red"},{n:10,c:"#ff6600",nm:"Orange"},{n:11,c:"#cc6600",nm:"Burnt Orange"},{n:12,c:"#ffee44",nm:"Yellow"},
-    {n:13,c:"#ccaa00",nm:"Yellow Gold"},{n:14,c:"#bb8800",nm:"Athletic Gold"},{n:15,c:"#aa7700",nm:"Gold"},
+    {n:1,c:"#000000",nm:"Black"},{n:2,c:"#333333",nm:"Charcoal"},{n:3,c:"#666666",nm:"Dark Gray"},{n:4,c:"#999999",nm:"Gray"},
+    {n:5,c:"#bbbbbb",nm:"Light Gray"},{n:6,c:"#778899",nm:"Blue Gray"},{n:7,c:"#ffffff",nm:"White"},{n:8,c:"#f5f0e0",nm:"Off White"},
+    {n:9,c:"#cc2222",nm:"Red"},{n:10,c:"#ff6600",nm:"Orange"},{n:11,c:"#cc6600",nm:"Burnt Orange"},{n:12,c:"#ffdd33",nm:"Yellow"},
+    {n:13,c:"#ccaa00",nm:"Yellow Gold"},{n:14,c:"#bb8800",nm:"Athletic Gold"},{n:15,c:"#997700",nm:"Gold"},
     {n:16,c:"#003388",nm:"Navy Blue"},{n:17,c:"#2255cc",nm:"Royal Blue"},{n:18,c:"#3388ff",nm:"Blue"},
-    {n:19,c:"#66bbff",nm:"Sky Blue"},{n:20,c:"#884400",nm:"Brown"},{n:21,c:"#663300",nm:"Chocolate"},
-    {n:22,c:"#442200",nm:"Dark Brown"},{n:23,c:"#c8a070",nm:"Tan"},{n:24,c:"#ddccaa",nm:"Flesh"},
+    {n:19,c:"#66bbff",nm:"Sky Blue"},{n:20,c:"#6b3a1f",nm:"Brown"},{n:21,c:"#4a2810",nm:"Chocolate"},
+    {n:22,c:"#2e1a08",nm:"Dark Brown"},{n:23,c:"#c8a878",nm:"Tan"},{n:24,c:"#e0ccb0",nm:"Flesh"},
     {n:25,c:"#009966",nm:"Teal"},{n:26,c:"#228833",nm:"Green"},{n:27,c:"#44cc55",nm:"Spring Green"},
     {n:28,c:"#115522",nm:"Forest Green"},{n:29,c:"#cc88ff",nm:"Lavender"},{n:30,c:"#7733bb",nm:"Purple"},
     {n:31,c:"#ff6699",nm:"Pink"},{n:32,c:"#dd2277",nm:"Magenta"},{n:33,c:"#881133",nm:"Maroon"},
-    {n:34,c:"#667733",nm:"Olive Green"},{n:35,c:"#556622",nm:"Olive Drab"},{n:36,c:"#999966",nm:"Khaki"}
+    {n:34,c:"#8b7355",nm:"Warm Brown"},{n:35,c:"#a09080",nm:"Warm Gray"},{n:36,c:"#bba888",nm:"Khaki"}
   ];
   const PIXEL_COLORS=PIXEL_PALETTE.map(p=>p.c);
   const PIXEL_SIZES=[{id:"16x16",label:"16×16",desc:"Icon",c:16,r:16},{id:"32x32",label:"32×32",desc:"Sprite",c:32,r:32},{id:"48x48",label:"48×48",desc:"Detailed",c:48,r:48},{id:"64x64",label:"64×64",desc:"Large",c:64,r:64},{id:"128x128",label:"128×128",desc:"HD",c:128,r:128},{id:"256x256",label:"256×256",desc:"Full",c:256,r:256},{id:"512x512",label:"512×512",desc:"Max",c:512,r:512}];
@@ -6104,19 +6104,21 @@ const NotebookPanel=()=>{
   const getColorNum=(hex)=>{if(!hex)return"";const h=hex.toLowerCase();const p=PIXEL_PALETTE.find(p=>p.c===h);return p?String(p.n):(pixCustomLabels[h]||"");};
   const drawPixelGrid=()=>{const c=pixCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const dims=getPixelDims();const cs=getPixelCellSize();const pixels=getPixels();
-    // White background like cross-stitch paper
-    ctx.fillStyle="#f8f8f8";ctx.fillRect(0,0,c.width,c.height);
-    // Thin gray cell grid lines
-    ctx.fillStyle="#ddd";
-    for(let x=0;x<=dims.c;x++)ctx.fillRect(x*cs,0,1,dims.r*cs);
-    for(let y=0;y<=dims.r;y++)ctx.fillRect(0,y*cs,dims.c*cs,1);
-    // Section borders — dark thick lines
-    if(pixelGridLines>0){ctx.fillStyle="#333";
-      for(let x=0;x<=dims.c;x+=pixelGridLines)ctx.fillRect(x*cs,0,1,dims.r*cs);
-      for(let y=0;y<=dims.r;y+=pixelGridLines)ctx.fillRect(0,y*cs,dims.c*cs,1);}
-    // Draw pixels on top — fill cell minus 1px for grid line
+    // Light background
+    ctx.fillStyle="#f0f0f0";ctx.fillRect(0,0,c.width,c.height);
+    // Draw pixels filling full cell
     Object.entries(pixels).forEach(([key,color])=>{const[r,cl]=key.split("-").map(Number);
-      if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs+1,r*cs+1,cs-1,cs-1);}});
+      if(r<dims.r&&cl<dims.c){ctx.fillStyle=color;ctx.fillRect(cl*cs,r*cs,cs,cs);}});
+    // Subtle grid lines on top — very light so they don't overwhelm
+    if(cs>=4){ctx.globalAlpha=0.15;ctx.fillStyle="#888";
+      for(let x=1;x<dims.c;x++)ctx.fillRect(x*cs,0,1,dims.r*cs);
+      for(let y=1;y<dims.r;y++)ctx.fillRect(0,y*cs,dims.c*cs,1);
+      ctx.globalAlpha=1;}
+    // Section borders — slightly darker
+    if(pixelGridLines>0){ctx.globalAlpha=0.5;ctx.fillStyle="#000";
+      for(let x=0;x<=dims.c;x+=pixelGridLines)ctx.fillRect(x*cs,0,1,dims.r*cs);
+      for(let y=0;y<=dims.r;y+=pixelGridLines)ctx.fillRect(0,y*cs,dims.c*cs,1);
+      ctx.globalAlpha=1;}
     // Number overlay
     if(showPixNumbers&&cs>=8){ctx.textAlign="center";ctx.textBaseline="middle";
       const fs=Math.max(5,Math.min(cs-3,11));ctx.font=`bold ${fs}px sans-serif`;
