@@ -6133,7 +6133,11 @@ const NotebookPanel=()=>{
   const pixImgFileRef=React.useRef(null);const pixImgModeRef=React.useRef(false);const pixImgSrcRef=React.useRef(null);
   const _pixImgConvert=(imgSrc,useFullColor,crop)=>{
     setPixImporting(true);
-    const img=new Image();img.onload=()=>{
+    try{
+    const img=new Image();
+    img.onerror=()=>{alert("Failed to load image");setPixImporting(false);setPixImgCrop(null);};
+    img.onload=()=>{
+      try{
       const dims=getPixelDims();const tc=document.createElement("canvas");tc.width=dims.c;tc.height=dims.r;
       const tctx=tc.getContext("2d");tctx.imageSmoothingEnabled=true;tctx.imageSmoothingQuality="medium";
       let sx,sy,sw,sh;
@@ -6148,9 +6152,13 @@ const NotebookPanel=()=>{
       }else{const pal=PIXEL_PALETTE.map(p=>p.c);const htr=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];const palRgb=pal.map(htr);
         const near=(r,g,b)=>{let bi=0,bd=Infinity;palRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return pal[bi];};
         for(let row=0;row<dims.r;row++)for(let col=0;col<dims.c;col++){const idx=(row*dims.c+col)*4;const r=data[idx],g=data[idx+1],b=data[idx+2],a=data[idx+3];if(a<30)continue;newPixels[`${row}-${col}`]=near(r,g,b);}}
-      const d=readNb();if(d.pages?.[pageIdxRef.current]){d.pages[pageIdxRef.current].pixels=newPixels;writeNb(d);setNbData(d);}
-      drawPixelGrid();setPixImporting(false);setPixImgCrop(null);
-    };img.src=imgSrc;};
+      const d=readNb();const pi=pageIdxRef.current;
+      if(d.pages?.[pi]){d.pages[pi].pixels=newPixels;saveNb(d);}
+      setTimeout(drawPixelGrid,50);setPixImporting(false);setPixImgCrop(null);
+      }catch(err){alert("Conversion error: "+err.message);setPixImporting(false);setPixImgCrop(null);}
+    };img.src=imgSrc;
+    }catch(err){alert("Import error: "+err.message);setPixImporting(false);setPixImgCrop(null);}
+  };
   const startImageImport=(fullColor)=>{const input=document.createElement("input");input.type="file";input.accept="image/*";
     input.onchange=(e)=>{const file=e.target.files[0];if(!file)return;pixImgModeRef.current=fullColor;
       const reader=new FileReader();reader.onload=(ev)=>{
