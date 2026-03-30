@@ -6158,6 +6158,7 @@ const NotebookPanel=()=>{
         const img=new Image();img.onload=()=>{setPixImgCrop({src:ev.target.result,imgW:img.width,imgH:img.height});setPixCropBox({x:0,y:0,w:100,h:100});};img.src=ev.target.result;
       };reader.readAsDataURL(file);};input.click();};
   const confirmCrop=()=>{if(pixImgSrcRef.current)_pixImgConvert(pixImgSrcRef.current,pixImgModeRef.current,pixCropBox);};
+  const quickConvert=()=>{if(pixImgSrcRef.current)_pixImgConvert(pixImgSrcRef.current,pixImgModeRef.current,null);};
 
   const setPixel=(row,col,color,erase)=>{const dims=getPixelDims();if(row<0||row>=dims.r||col<0||col>=dims.c)return;
     const key=`${row}-${col}`;const d=readNb();if(!d.pages?.[nbPageIdx])return;
@@ -6376,21 +6377,22 @@ const NotebookPanel=()=>{
           <button key={g.v} onClick={()=>setPixelGridLines(g.v)} style={{padding:"2px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:pixelGridLines===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:pixelGridLines===g.v?"rgba(254,202,87,.12)":"transparent",color:pixelGridLines===g.v?"#feca57":"#666",cursor:"pointer"}}>{g.l}</button>))}
       </div>
       {/* Image crop UI */}
-      {pixImgCrop&&<div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,.9)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{fontSize:14,fontWeight:800,color:"#e8e0f0",marginBottom:8}}>Crop Image</div>
-        <div style={{position:"relative",maxWidth:300,maxHeight:300,marginBottom:12}}>
-          <img src={pixImgCrop.src} style={{maxWidth:300,maxHeight:300,objectFit:"contain",borderRadius:8,opacity:.4}}/>
-          <div style={{position:"absolute",left:`${pixCropBox.x}%`,top:`${pixCropBox.y}%`,width:`${pixCropBox.w}%`,height:`${pixCropBox.h}%`,border:"2px solid #feca57",borderRadius:4,background:"rgba(254,202,87,.08)"}}/>
+      {pixImgCrop&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.95)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{fontSize:16,fontWeight:800,color:"#e8e0f0",marginBottom:10}}>Select Area to Convert</div>
+        <div style={{position:"relative",maxWidth:280,maxHeight:280,marginBottom:12}}>
+          <img src={pixImgCrop.src} style={{maxWidth:280,maxHeight:280,objectFit:"contain",borderRadius:8,opacity:.5,display:"block"}}/>
+          <div style={{position:"absolute",left:`${pixCropBox.x}%`,top:`${pixCropBox.y}%`,width:`${pixCropBox.w}%`,height:`${pixCropBox.h}%`,border:"2px solid #feca57",borderRadius:4,background:"rgba(254,202,87,.12)"}}/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8,width:200}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10,width:200}}>
           {[{k:"x",l:"X %"},{k:"y",l:"Y %"},{k:"w",l:"W %"},{k:"h",l:"H %"}].map(f=>(
             <div key={f.k}><div style={{fontSize:10,opacity:.4}}>{f.l}</div>
             <input type="number" min="0" max="100" value={pixCropBox[f.k]} onChange={e=>setPixCropBox(p=>({...p,[f.k]:Math.max(0,Math.min(100,Number(e.target.value)||0))}))}
-              style={{width:"100%",padding:"4px 6px",borderRadius:6,border:"1px solid rgba(254,202,87,.3)",background:"rgba(254,202,87,.06)",color:"#feca57",fontSize:13,textAlign:"center",outline:"none"}}/></div>))}
+              style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid rgba(254,202,87,.3)",background:"rgba(254,202,87,.08)",color:"#feca57",fontSize:14,textAlign:"center",outline:"none"}}/></div>))}
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={confirmCrop} style={{padding:"8px 20px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:14,fontWeight:700,cursor:"pointer"}}>Convert</button>
-          <button onClick={()=>{setPixImgCrop(null);setPixImporting(false);}} style={{padding:"8px 20px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
+          <button onClick={quickConvert} style={{padding:"10px 18px",borderRadius:10,background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",fontSize:14,fontWeight:700,cursor:"pointer"}}>Full Image</button>
+          <button onClick={confirmCrop} style={{padding:"10px 18px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:14,fontWeight:700,cursor:"pointer"}}>Crop & Convert</button>
+          <button onClick={()=>{setPixImgCrop(null);setPixImporting(false);}} style={{padding:"10px 18px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
         </div>
       </div>}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
