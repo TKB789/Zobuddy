@@ -6666,8 +6666,8 @@ const NotebookPanel=()=>{
         <button onClick={()=>{if(!confirm("Clear all pixels?"))return;const d=readNb();if(d.pages?.[nbPageIdx]){d.pages[nbPageIdx].pixels={};writeNb(d);drawPixelGrid();}}}
           style={btn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:10,padding:"3px 8px"})}>🗑 Clear</button>
         <div style={{flex:1}}/>
-        <button onClick={printPixelArt} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>
         <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.12)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",fontSize:10,padding:"3px 8px"}:{fontSize:10,padding:"3px 8px",color:"#888"})}>💾 {saved?"Saved":"Save"}</button>
+        <button onClick={printPixelArt} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>
         <button onClick={archiveCurrentPage} style={btn({color:"#888",fontSize:10,padding:"3px 8px"})}>🗃 Archive</button>
         <button onClick={deleteCurrentPage} style={btn({color:"#888",fontSize:10,padding:"3px 8px"})}>🗑 Delete</button>
       </div>
@@ -6729,7 +6729,7 @@ const NotebookPanel=()=>{
       })()}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
         <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
-          <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"pan-x pan-y",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
+          <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"none",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
         </div></div></div>);
   }
 
