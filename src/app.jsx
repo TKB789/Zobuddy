@@ -6392,13 +6392,20 @@ const NotebookPanel=()=>{
   };
   const confirmCrop=()=>{if(pixImgSrcRef.current)_pixImgConvert(pixImgSrcRef.current,pixImgModeRef.current,pixCropBox);};
 
+  // pixStrokeAction: "place" or "erase" — locked at start of each stroke so dragging is consistent
+  const pixStrokeAction=React.useRef(null);
+  const pixPaintedCells=React.useRef(new Set()); // track cells already painted this stroke
   const setPixel=(row,col,color,erase)=>{const dims=getPixelDims();if(row<0||row>=dims.r||col<0||col>=dims.c)return;
-    const key=`${row}-${col}`;const d=readNb();if(!d.pages?.[nbPageIdx])return;
+    const key=`${row}-${col}`;
+    // Skip if already painted this cell in current stroke
+    if(pixPaintedCells.current.has(key))return;
+    pixPaintedCells.current.add(key);
+    const d=readNb();if(!d.pages?.[nbPageIdx])return;
     const pixels=d.pages[nbPageIdx].pixels||{};const old=pixels[key]||null;
     if(erase){delete pixels[key];}
-    else if(pixels[key]===color)delete pixels[key];else pixels[key]=color;
+    else{pixels[key]=color;}
     const newVal=pixels[key]||null;
-    pixelUndoRef.current.push({key,old,newVal});pixelRedoRef.current=[];
+    if(old!==newVal){pixelUndoRef.current.push({key,old,newVal});pixelRedoRef.current=[];}
     d.pages[nbPageIdx].pixels=pixels;writeNb(d);
     const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();
       if(pixels[key]){ctx.fillStyle=pixels[key];ctx.fillRect(col*cs,row*cs,cs,cs);}
@@ -6457,6 +6464,7 @@ const NotebookPanel=()=>{
     if(isStart){
       pixIsPainting.current=true;pixCancelled.current=false;pixMoved.current=false;
       pixLastCell.current=null;
+      pixPaintedCells.current=new Set(); // reset for new stroke
       const cell=cellFromTouchFn(t);
       if(cell){pixLastCell.current=cell;pixStartPos.current=cell;}
       e.preventDefault();
@@ -6473,16 +6481,22 @@ const NotebookPanel=()=>{
     pixLastCell.current=cell;
   };
   pixEndRef.current=(e)=>{
-    if(pixIsPainting.current&&!pixCancelled.current&&e.changedTouches){
-      const t=e.changedTouches[0];
-      const cell=cellFromTouchFn(t);
-      if(cell&&!pixMoved.current){paintCellFn(cell.row,cell.col);}
-      else if(cell&&pixMoved.current){
-        const last=pixLastCell.current;
-        if(last&&(last.row!==cell.row||last.col!==cell.col))paintLineFn(last.row,last.col,cell.row,cell.col);
+    // On touch end, only paint if we moved to a NEW cell not yet painted
+    if(pixIsPainting.current&&!pixCancelled.current){
+      if(e.changedTouches){
+        const t=e.changedTouches[0];
+        const cell=cellFromTouchFn(t);
+        if(cell){
+          const last=pixLastCell.current;
+          if(last&&(last.row!==cell.row||last.col!==cell.col)){
+            paintLineFn(last.row,last.col,cell.row,cell.col);
+          }
+          // For single tap: touchstart already painted it, no need to re-fire
+        }
       }
     }
     pixPinchDist.current=null;pixLastCell.current=null;
+    pixPaintedCells.current=new Set();
     pixIsPainting.current=false;pixCancelled.current=false;
   };
   const pixCanvasCallbackRef=React.useCallback((node)=>{if(node){pixCanvasRef.current=node;
