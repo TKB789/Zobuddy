@@ -6423,23 +6423,25 @@ const NotebookPanel=()=>{
   const pixLastCell=React.useRef(null);
   // Pinch zoom
   const pixPinchDist=React.useRef(null);
-  const cellFromTouch=(t)=>{
+  const cellFromTouchFn=(t)=>{
     const c=pixCanvasRef.current;if(!c)return null;
     const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;
     const dims=getPixelDims();const cs=getPixelCellSize();
     const col=Math.floor(((t.clientX-r.left)*sx)/cs);const row=Math.floor(((t.clientY-r.top)*sy)/cs);
     if(row>=0&&row<dims.r&&col>=0&&col<dims.c)return{row,col};return null;
   };
-  const paintCell=(row,col)=>{setPixel(row,col,pixColorRef.current,pixEraserRef.current);};
+  const paintCellFn=(row,col)=>{setPixel(row,col,pixColorRef.current,pixEraserRef.current);};
   // Bresenham line between two cells to fill gaps during fast strokes
-  const paintLine=(r0,c0,r1,c1)=>{
+  const paintLineFn=(r0,c0,r1,c1)=>{
     const dr=Math.abs(r1-r0),dc=Math.abs(c1-c0);
     const sr=r0<r1?1:-1,sc=c0<c1?1:-1;
     let err=dc-dr,r=r0,c=c0;
-    while(true){paintCell(r,c);if(r===r1&&c===c1)break;const e2=2*err;if(e2>-dr){err-=dr;c+=sc;}if(e2<dc){err+=dc;r+=sr;}}
+    while(true){paintCellFn(r,c);if(r===r1&&c===c1)break;const e2=2*err;if(e2>-dr){err-=dr;c+=sc;}if(e2<dc){err+=dc;r+=sr;}}
   };
-  const handlePixEvent=(e,isStart)=>{
-    // Two+ fingers = gesture — cancel painting, handle pinch zoom
+  // Use refs so event listeners always call the latest handler version
+  const pixHandlerRef=React.useRef(null);
+  const pixEndRef=React.useRef(null);
+  pixHandlerRef.current=(e,isStart)=>{
     if(e.touches&&e.touches.length>1){
       pixIsPainting.current=false;pixCancelled.current=true;
       const t1=e.touches[0],t2=e.touches[1];
@@ -6448,59 +6450,49 @@ const NotebookPanel=()=>{
         const scale=dist/pixPinchDist.current;
         if(Math.abs(scale-1)>0.01)setPageZoom(z=>Math.max(0.3,Math.min(8,z*scale)));
       }
-      pixPinchDist.current=dist;
-      return;
+      pixPinchDist.current=dist;return;
     }
     pixPinchDist.current=null;
     const t=e.touches?e.touches[0]:e;
     if(isStart){
       pixIsPainting.current=true;pixCancelled.current=false;pixMoved.current=false;
       pixLastCell.current=null;
-      const cell=cellFromTouch(t);
+      const cell=cellFromTouchFn(t);
       if(cell){pixLastCell.current=cell;pixStartPos.current=cell;}
-      e.preventDefault(); // Claim touch immediately so single tap works
-      if(cell)paintCell(cell.row,cell.col);
+      e.preventDefault();
+      if(cell)paintCellFn(cell.row,cell.col);
       return;
     }
     if(!pixIsPainting.current||pixCancelled.current)return;
     e.preventDefault();pixMoved.current=true;
-    const cell=cellFromTouch(t);if(!cell)return;
+    const cell=cellFromTouchFn(t);if(!cell)return;
     const last=pixLastCell.current;
     if(last&&(last.row!==cell.row||last.col!==cell.col)){
-      paintLine(last.row,last.col,cell.row,cell.col);
-    }else{paintCell(cell.row,cell.col);}
+      paintLineFn(last.row,last.col,cell.row,cell.col);
+    }else{paintCellFn(cell.row,cell.col);}
     pixLastCell.current=cell;
   };
-  const handlePixEnd=(e)=>{
-    // On touch end: if we barely moved (single tap or tiny drag), paint at the touch point
+  pixEndRef.current=(e)=>{
     if(pixIsPainting.current&&!pixCancelled.current&&e.changedTouches){
       const t=e.changedTouches[0];
-      const cell=cellFromTouch(t);
-      if(cell){
-        if(!pixMoved.current){
-          // Single tap — paint this cell
-          paintCell(cell.row,cell.col);
-        }else{
-          // End of drag — connect last point
-          const last=pixLastCell.current;
-          if(last&&(last.row!==cell.row||last.col!==cell.col)){
-            paintLine(last.row,last.col,cell.row,cell.col);
-          }
-        }
+      const cell=cellFromTouchFn(t);
+      if(cell&&!pixMoved.current){paintCellFn(cell.row,cell.col);}
+      else if(cell&&pixMoved.current){
+        const last=pixLastCell.current;
+        if(last&&(last.row!==cell.row||last.col!==cell.col))paintLineFn(last.row,last.col,cell.row,cell.col);
       }
     }
     pixPinchDist.current=null;pixLastCell.current=null;
     pixIsPainting.current=false;pixCancelled.current=false;
   };
-  const paintPixAt=(t)=>{
-    const cell=cellFromTouch(t);if(cell)paintCell(cell.row,cell.col);
-  };
   const pixCanvasCallbackRef=React.useCallback((node)=>{if(node){pixCanvasRef.current=node;
-    node.addEventListener("touchstart",(e)=>handlePixEvent(e,true),{passive:false});
-    node.addEventListener("touchmove",(e)=>handlePixEvent(e,false),{passive:false});
-    node.addEventListener("touchend",(e)=>handlePixEnd(e));
-    node.addEventListener("mousedown",(e)=>handlePixEvent(e,true));node.addEventListener("mousemove",(e)=>handlePixEvent(e,false));
-    node.addEventListener("mouseup",()=>{pixIsPainting.current=false;});node.addEventListener("mouseleave",()=>{pixIsPainting.current=false;});
+    node.addEventListener("touchstart",(e)=>pixHandlerRef.current(e,true),{passive:false});
+    node.addEventListener("touchmove",(e)=>pixHandlerRef.current(e,false),{passive:false});
+    node.addEventListener("touchend",(e)=>pixEndRef.current(e));
+    node.addEventListener("mousedown",(e)=>pixHandlerRef.current(e,true));
+    node.addEventListener("mousemove",(e)=>pixHandlerRef.current(e,false));
+    node.addEventListener("mouseup",()=>{pixIsPainting.current=false;});
+    node.addEventListener("mouseleave",()=>{pixIsPainting.current=false;});
     setTimeout(drawPixelGrid,50);}},[nbPageIdx]);
 
   // Redraw when grid section lines change
@@ -6607,12 +6599,23 @@ const NotebookPanel=()=>{
             <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
           </div>
       </div>
-      {/* Row 1: Color palette — primary picks + expand */}
+      {/* Row 1: Color palette — primaries, complements, neutrals + expand */}
       <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
         <button onClick={()=>setPixelEraser(e=>!e)} style={btn(pixelEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",boxShadow:"0 0 8px rgba(245,87,108,.3)",padding:"4px 8px"}:{color:"#ccc",padding:"4px 8px"})}>
           {pixelEraser?"🧹":"✏️"}</button>
         <div style={{width:1,height:20,background:"rgba(255,255,255,.1)"}}/>
-        {DMC_CONVERT_PALETTE.slice(0,12).map(p=>(<div key={p.c} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} style={{width:22,height:22,borderRadius:4,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",opacity:pixelEraser?.4:1}}/>))}
+        {/* Primaries + complements + neutrals: Red,Blue,Yellow | Green,Orange,Purple | Black,Gray,White */}
+        {[
+          PIXEL_PALETTE.find(p=>p.n==="321"),  // Red
+          PIXEL_PALETTE.find(p=>p.n==="797"),  // Blue
+          PIXEL_PALETTE.find(p=>p.n==="973"),  // Yellow
+          PIXEL_PALETTE.find(p=>p.n==="699"),  // Green (complement of Red)
+          PIXEL_PALETTE.find(p=>p.n==="740"),  // Orange (complement of Blue)
+          PIXEL_PALETTE.find(p=>p.n==="550"),  // Purple (complement of Yellow)
+          PIXEL_PALETTE.find(p=>p.n==="310"),  // Black
+          PIXEL_PALETTE.find(p=>p.n==="414"),  // Gray
+          PIXEL_PALETTE.find(p=>p.n==="Blanc") // White
+        ].filter(Boolean).map(p=>(<div key={p.n} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} ${p.nm}`} style={{width:24,height:24,borderRadius:4,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",opacity:pixelEraser?.4:1}}/>))}
         <button onClick={()=>{setShowPixPicker(v=>!v);setPixPaletteSearch("");}} style={btn({padding:"4px 8px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>{showPixPicker?"▼":"🎨"}</button>
       </div>
       {/* Full DMC color picker */}
