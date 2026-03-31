@@ -6102,27 +6102,158 @@ const NotebookPanel=()=>{
 
   // ─── PIXEL ART ──────────────────────────────────────────────────
   const pixCanvasRef=React.useRef(null);const pixIsPainting=React.useRef(false);const pixelUndoRef=React.useRef([]);const pixelRedoRef=React.useRef([]);
-  // 36-color cross-stitch palette based on standard thread chart
+  // DMC embroidery thread color palette — full standard collection
   const PIXEL_PALETTE=[
-    {n:1,c:"#000000",nm:"Black"},{n:2,c:"#333333",nm:"Charcoal"},{n:3,c:"#666666",nm:"Dark Gray"},{n:4,c:"#999999",nm:"Gray"},
-    {n:5,c:"#bbbbbb",nm:"Light Gray"},{n:6,c:"#778899",nm:"Blue Gray"},{n:7,c:"#ffffff",nm:"White"},{n:8,c:"#f5f0e0",nm:"Off White"},
-    {n:9,c:"#cc2222",nm:"Red"},{n:10,c:"#ff6600",nm:"Orange"},{n:11,c:"#cc6600",nm:"Burnt Orange"},{n:12,c:"#ffdd33",nm:"Yellow"},
-    {n:13,c:"#ccaa00",nm:"Yellow Gold"},{n:14,c:"#bb8800",nm:"Athletic Gold"},{n:15,c:"#997700",nm:"Gold"},
-    {n:16,c:"#003388",nm:"Navy Blue"},{n:17,c:"#2255cc",nm:"Royal Blue"},{n:18,c:"#3388ff",nm:"Blue"},
-    {n:19,c:"#66bbff",nm:"Sky Blue"},{n:20,c:"#6b3a1f",nm:"Brown"},{n:21,c:"#4a2810",nm:"Chocolate"},
-    {n:22,c:"#2e1a08",nm:"Dark Brown"},{n:23,c:"#c8a878",nm:"Tan"},{n:24,c:"#e0ccb0",nm:"Flesh"},
-    {n:25,c:"#009966",nm:"Teal"},{n:26,c:"#228833",nm:"Green"},{n:27,c:"#44cc55",nm:"Spring Green"},
-    {n:28,c:"#115522",nm:"Forest Green"},{n:29,c:"#cc88ff",nm:"Lavender"},{n:30,c:"#7733bb",nm:"Purple"},
-    {n:31,c:"#ff6699",nm:"Pink"},{n:32,c:"#dd2277",nm:"Magenta"},{n:33,c:"#881133",nm:"Maroon"},
-    {n:34,c:"#8b7355",nm:"Warm Brown"},{n:35,c:"#a09080",nm:"Warm Gray"},{n:36,c:"#bba888",nm:"Khaki"}
+    {n:"310",c:"#000000",nm:"Black"},{n:"3799",c:"#424240",nm:"Pewter Gray Vy Dk"},{n:"413",c:"#565656",nm:"Pewter Gray Dk"},{n:"317",c:"#6C6B6B",nm:"Pewter Gray"},
+    {n:"414",c:"#8C8C8C",nm:"Steel Gray Dk"},{n:"318",c:"#A9A9A6",nm:"Steel Gray Lt"},{n:"415",c:"#D8D8D4",nm:"Pearl Gray"},{n:"762",c:"#ECECEC",nm:"Pearl Gray Vy Lt"},
+    {n:"Blanc",c:"#FFFFFF",nm:"White"},{n:"Ecru",c:"#F0EADC",nm:"Ecru"},{n:"712",c:"#FFFCE6",nm:"Cream"},{n:"746",c:"#FFF8E7",nm:"Off White"},
+    {n:"321",c:"#C7252C",nm:"Christmas Red"},{n:"666",c:"#E31D42",nm:"Christmas Red Bright"},{n:"304",c:"#B71F33",nm:"Christmas Red Md"},{n:"498",c:"#A7132B",nm:"Christmas Red Dk"},
+    {n:"349",c:"#D21035",nm:"Coral Dk"},{n:"350",c:"#E04848",nm:"Coral Md"},{n:"351",c:"#E96A67",nm:"Coral"},{n:"352",c:"#FD9C97",nm:"Coral Lt"},
+    {n:"353",c:"#FEC5BB",nm:"Peach Flesh"},{n:"948",c:"#FEE5D6",nm:"Peach Vy Lt"},{n:"754",c:"#F7C4A8",nm:"Peach Lt"},{n:"758",c:"#EEA988",nm:"Terra Cotta Vy Lt"},
+    {n:"355",c:"#984333",nm:"Terra Cotta Dk"},{n:"356",c:"#C46950",nm:"Terra Cotta Md"},{n:"3830",c:"#BC6152",nm:"Terra Cotta"},{n:"3778",c:"#D88878",nm:"Terra Cotta Lt"},
+    {n:"606",c:"#FA3104",nm:"Bright Orange Red"},{n:"608",c:"#FD6C20",nm:"Bright Orange"},{n:"740",c:"#FF8313",nm:"Tangerine"},{n:"741",c:"#FFA024",nm:"Tangerine Md"},
+    {n:"742",c:"#FFD16B",nm:"Tangerine Lt"},{n:"743",c:"#FED77A",nm:"Yellow Md Lt"},{n:"744",c:"#FFE793",nm:"Yellow Pale"},{n:"307",c:"#FDED54",nm:"Lemon"},
+    {n:"973",c:"#FFE502",nm:"Canary Bright"},{n:"444",c:"#FFD700",nm:"Lemon Dk"},{n:"725",c:"#FFC840",nm:"Topaz"},{n:"726",c:"#FDD755",nm:"Topaz Lt"},
+    {n:"972",c:"#FFB515",nm:"Canary Deep"},{n:"970",c:"#F78B13",nm:"Pumpkin Lt"},{n:"946",c:"#EB5C0C",nm:"Burnt Orange Md"},{n:"900",c:"#D55A11",nm:"Burnt Orange Dk"},
+    {n:"720",c:"#E35728",nm:"Orange Spice Dk"},{n:"721",c:"#F27842",nm:"Orange Spice Md"},{n:"722",c:"#F7A762",nm:"Orange Spice Lt"},{n:"402",c:"#F7A96C",nm:"Mahogany Vy Lt"},
+    {n:"676",c:"#E4C77C",nm:"Old Gold Lt"},{n:"729",c:"#D3A638",nm:"Old Gold Md"},{n:"680",c:"#BC8D0C",nm:"Dark Old Gold"},{n:"783",c:"#CE9F13",nm:"Topaz Md"},
+    {n:"3820",c:"#DFB038",nm:"Straw Dk"},{n:"3821",c:"#F0C848",nm:"Straw"},{n:"3822",c:"#F6D870",nm:"Straw Lt"},{n:"3852",c:"#CD9620",nm:"Straw Vy Dk"},
+    {n:"300",c:"#6F3510",nm:"Mahogany Vy Dk"},{n:"301",c:"#B35F2E",nm:"Mahogany Md"},{n:"400",c:"#8D4126",nm:"Mahogany Dk"},{n:"3826",c:"#AD6530",nm:"Golden Brown"},
+    {n:"975",c:"#7D4A18",nm:"Golden Brown Dk"},{n:"976",c:"#C28138",nm:"Golden Brown Md"},{n:"977",c:"#DC9B40",nm:"Golden Brown Lt"},{n:"3827",c:"#F7BE6E",nm:"Golden Brown Pale"},
+    {n:"433",c:"#7A5120",nm:"Brown Md"},{n:"434",c:"#985F26",nm:"Brown Lt"},{n:"435",c:"#B37830",nm:"Brown Vy Lt"},{n:"436",c:"#CB9848",nm:"Tan"},
+    {n:"437",c:"#DBBC80",nm:"Tan Lt"},{n:"738",c:"#DBBF95",nm:"Tan Vy Lt"},{n:"739",c:"#F1DCC1",nm:"Tan Ult Vy Lt"},{n:"543",c:"#F2DFC6",nm:"Beige Brown Ult Vy Lt"},
+    {n:"898",c:"#492818",nm:"Coffee Brown Vy Dk"},{n:"801",c:"#653618",nm:"Coffee Brown Dk"},{n:"938",c:"#3C2212",nm:"Coffee Brown Ult Dk"},{n:"3371",c:"#1E120A",nm:"Black Brown"},
+    {n:"420",c:"#A07240",nm:"Hazel Nut Brown Dk"},{n:"422",c:"#C09C6C",nm:"Hazel Nut Brown Lt"},{n:"869",c:"#835E2E",nm:"Hazel Nut Brown Vy Dk"},{n:"3828",c:"#B0885C",nm:"Hazel Nut Brown"},
+    {n:"335",c:"#EE5570",nm:"Rose"},{n:"326",c:"#B33854",nm:"Rose Vy Dp"},{n:"309",c:"#B63060",nm:"Rose Dk"},{n:"899",c:"#F2546E",nm:"Rose Md"},
+    {n:"956",c:"#FF7189",nm:"Geranium"},{n:"957",c:"#FD9BB3",nm:"Geranium Pale"},{n:"891",c:"#FF496C",nm:"Carnation Dk"},{n:"892",c:"#FF6883",nm:"Carnation Md"},
+    {n:"893",c:"#FC8EA3",nm:"Carnation Lt"},{n:"894",c:"#FFB0C0",nm:"Carnation Vy Lt"},{n:"818",c:"#FFDFD8",nm:"Baby Pink"},{n:"776",c:"#FCB4B8",nm:"Pink Md"},
+    {n:"961",c:"#CF5571",nm:"Dusty Rose Dk"},{n:"962",c:"#E87891",nm:"Dusty Rose Md"},{n:"3354",c:"#E4949E",nm:"Dusty Rose Lt"},{n:"963",c:"#FFD1DC",nm:"Dusty Rose Ult Vy Lt"},
+    {n:"3350",c:"#BC4365",nm:"Dusty Rose Ult Dk"},{n:"150",c:"#AB5236",nm:"Dusty Rose Vy Dk"},{n:"151",c:"#F0A0B5",nm:"Dusty Rose Vy Lt"},{n:"152",c:"#E2A099",nm:"Shell Pink Md Lt"},
+    {n:"221",c:"#883E3A",nm:"Shell Pink Vy Dk"},{n:"223",c:"#CC847C",nm:"Shell Pink Lt"},{n:"224",c:"#EBADA8",nm:"Shell Pink Vy Lt"},{n:"225",c:"#FFE0DA",nm:"Shell Pink Ult Vy Lt"},
+    {n:"3685",c:"#88264A",nm:"Mauve Vy Dk"},{n:"3687",c:"#C76275",nm:"Mauve"},{n:"3688",c:"#E89DA5",nm:"Mauve Md"},{n:"3689",c:"#FCBCC4",nm:"Mauve Lt"},
+    {n:"902",c:"#821132",nm:"Garnet Vy Dk"},{n:"814",c:"#7B0024",nm:"Garnet Dk"},{n:"815",c:"#880029",nm:"Garnet Md"},{n:"816",c:"#970028",nm:"Garnet"},
+    {n:"817",c:"#BB0024",nm:"Coral Red Vy Dk"},{n:"3801",c:"#E7272A",nm:"Melon Vy Dk"},{n:"3705",c:"#FF6B84",nm:"Melon Dk"},{n:"3706",c:"#FFAAB8",nm:"Melon Md"},
+    {n:"3708",c:"#FFC8D5",nm:"Melon Lt"},{n:"3712",c:"#F5A0A0",nm:"Salmon Md"},{n:"3328",c:"#E36D6D",nm:"Salmon Dk"},{n:"347",c:"#BF2D36",nm:"Salmon Vy Dk"},
+    {n:"760",c:"#F5A5A0",nm:"Salmon"},{n:"761",c:"#FFC4C4",nm:"Salmon Lt"},{n:"3713",c:"#FFE0E0",nm:"Salmon Vy Lt"},{n:"3340",c:"#FF7E5B",nm:"Apricot Md"},
+    {n:"3341",c:"#FCAB8B",nm:"Apricot"},{n:"967",c:"#FFCFCA",nm:"Apricot Vy Lt"},{n:"3824",c:"#FEACA8",nm:"Apricot Lt"},{n:"945",c:"#FDDEB5",nm:"Tawny"},
+    {n:"950",c:"#EEC6A8",nm:"Desert Sand Lt"},{n:"951",c:"#FFE0B5",nm:"Tawny Lt"},{n:"3064",c:"#BC7C60",nm:"Desert Sand"},{n:"407",c:"#BC7F67",nm:"Sportsman Flesh Vy Dk"},
+    {n:"3772",c:"#A06048",nm:"Desert Sand Dk"},{n:"3773",c:"#B87C64",nm:"Desert Sand Md"},{n:"3774",c:"#F0C8B0",nm:"Desert Sand Vy Lt"},{n:"3770",c:"#FFDEC8",nm:"Tawny Vy Lt"},
+    {n:"915",c:"#820043",nm:"Plum Dk"},{n:"917",c:"#9B1868",nm:"Plum Md"},{n:"718",c:"#9C2463",nm:"Plum"},{n:"3607",c:"#C44080",nm:"Plum Lt"},
+    {n:"3608",c:"#EA83B8",nm:"Plum Vy Lt"},{n:"3609",c:"#F4A4CC",nm:"Plum Ult Lt"},{n:"3804",c:"#D03068",nm:"Cyclamen Pink Dk"},{n:"3805",c:"#F3488E",nm:"Cyclamen Pink"},
+    {n:"3806",c:"#FF83A8",nm:"Cyclamen Pink Lt"},{n:"600",c:"#CD2E5A",nm:"Cranberry Vy Dk"},{n:"601",c:"#D13366",nm:"Cranberry Dk"},{n:"602",c:"#E24777",nm:"Cranberry Md"},
+    {n:"603",c:"#FF7393",nm:"Cranberry"},{n:"604",c:"#FF8FAB",nm:"Cranberry Lt"},{n:"3803",c:"#AB2444",nm:"Mauve Dk"},{n:"3831",c:"#B83448",nm:"Raspberry Dk"},
+    {n:"3832",c:"#DB6472",nm:"Raspberry Md"},{n:"3833",c:"#EA8C94",nm:"Raspberry Lt"},
+    {n:"315",c:"#814952",nm:"Antique Mauve Vy Dk"},{n:"316",c:"#B8758A",nm:"Antique Mauve Md"},{n:"778",c:"#DFB0AA",nm:"Antique Mauve Vy Lt"},{n:"3726",c:"#9C535C",nm:"Antique Mauve Dk"},
+    {n:"3727",c:"#DBA0AC",nm:"Antique Mauve Lt"},{n:"3802",c:"#7B2B3A",nm:"Antique Mauve Vy Dk2"},
+    {n:"208",c:"#835EA7",nm:"Lavender Vy Dk"},{n:"209",c:"#A37CC2",nm:"Lavender Dk"},{n:"210",c:"#C3A0D8",nm:"Lavender Md"},{n:"211",c:"#E2CDE9",nm:"Lavender Lt"},
+    {n:"3837",c:"#6C3C7C",nm:"Lavender Ult Dk"},{n:"153",c:"#E6CCD9",nm:"Violet Vy Lt"},{n:"154",c:"#572433",nm:"Grape Vy Dk"},{n:"327",c:"#633564",nm:"Violet Dk"},
+    {n:"550",c:"#5C2C6D",nm:"Violet Vy Dk"},{n:"552",c:"#8039A0",nm:"Violet Md"},{n:"553",c:"#A368B5",nm:"Violet"},{n:"554",c:"#DBB3D9",nm:"Violet Lt"},
+    {n:"3834",c:"#724870",nm:"Grape Dk"},{n:"3835",c:"#9480A8",nm:"Grape Md"},{n:"3836",c:"#BA9CC0",nm:"Grape Lt"},{n:"3740",c:"#786074",nm:"Antique Violet Dk"},
+    {n:"3041",c:"#956B7A",nm:"Antique Violet Md"},{n:"3042",c:"#B88FA2",nm:"Antique Violet Lt"},{n:"3743",c:"#D7C6D0",nm:"Antique Violet Vy Lt"},
+    {n:"333",c:"#5C3C85",nm:"Blue Violet Vy Dk"},{n:"155",c:"#9891B6",nm:"Blue Violet Md Dk"},{n:"156",c:"#A3AED1",nm:"Blue Violet Md Lt"},{n:"340",c:"#ADA7D4",nm:"Blue Violet Md"},
+    {n:"341",c:"#B8B4D8",nm:"Blue Violet Lt"},{n:"3746",c:"#7768A0",nm:"Blue Violet Dk"},{n:"3747",c:"#D0D0E8",nm:"Blue Violet Vy Lt"},
+    {n:"3838",c:"#5C6EB0",nm:"Lavender Blue Dk"},{n:"3839",c:"#7B8DC4",nm:"Lavender Blue Md"},{n:"3840",c:"#B0C0E0",nm:"Lavender Blue Lt"},{n:"3807",c:"#606EA0",nm:"Cornflower Blue"},
+    {n:"791",c:"#46427E",nm:"Cornflower Blue Vy Dk"},{n:"792",c:"#556DB0",nm:"Cornflower Blue Dk"},{n:"793",c:"#708DC4",nm:"Cornflower Blue Md"},{n:"794",c:"#8FAFD6",nm:"Cornflower Blue Lt"},
+    {n:"158",c:"#4C526E",nm:"Cornflower Blue Vy Dk2"},{n:"157",c:"#BBD0E9",nm:"Cornflower Blue Vy Lt"},
+    {n:"336",c:"#253B73",nm:"Navy Blue"},{n:"823",c:"#0C2555",nm:"Navy Blue Dk"},{n:"939",c:"#1B204B",nm:"Navy Blue Vy Dk"},{n:"311",c:"#1C3B6B",nm:"Navy Blue Md"},
+    {n:"312",c:"#2B5B93",nm:"Navy Blue Lt"},{n:"322",c:"#5A8DBF",nm:"Navy Blue Vy Lt"},{n:"334",c:"#739EC3",nm:"Baby Blue Md"},{n:"3325",c:"#B3D2E8",nm:"Baby Blue Lt"},
+    {n:"3755",c:"#93B8D8",nm:"Baby Blue"},{n:"775",c:"#D1E6F5",nm:"Baby Blue Vy Lt"},{n:"3841",c:"#CDDBEE",nm:"Baby Blue Pale"},{n:"3756",c:"#EEEEF6",nm:"Baby Blue Ult Vy Lt"},
+    {n:"796",c:"#1B3B8E",nm:"Royal Blue Dk"},{n:"797",c:"#1E4497",nm:"Royal Blue"},{n:"820",c:"#0E4880",nm:"Royal Blue Vy Dk"},{n:"798",c:"#4672B8",nm:"Delft Blue Dk"},
+    {n:"799",c:"#748EC4",nm:"Delft Blue Md"},{n:"800",c:"#C0D4E8",nm:"Delft Blue Pale"},{n:"809",c:"#949FD0",nm:"Delft Blue"},
+    {n:"824",c:"#174F88",nm:"Blue Vy Dk"},{n:"825",c:"#2E6AA2",nm:"Blue Dk"},{n:"826",c:"#5395B7",nm:"Blue Md"},{n:"827",c:"#BDDBE5",nm:"Blue Vy Lt"},
+    {n:"813",c:"#A1C5DB",nm:"Blue Lt"},{n:"828",c:"#C5E1ED",nm:"Blue Ult Vy Lt"},{n:"3842",c:"#326C98",nm:"Wedgewood Vy Dk"},{n:"517",c:"#3B7CB0",nm:"Wedgewood Dk"},
+    {n:"518",c:"#4F93BB",nm:"Wedgewood Lt"},{n:"519",c:"#7EB7D0",nm:"Sky Blue"},{n:"3760",c:"#3E86A0",nm:"Wedgewood Md"},{n:"3761",c:"#ACD8E5",nm:"Sky Blue Lt"},
+    {n:"995",c:"#26A0DA",nm:"Electric Blue Dk"},{n:"996",c:"#30C4F6",nm:"Electric Blue Md"},{n:"3843",c:"#14B0D4",nm:"Electric Blue"},
+    {n:"3844",c:"#18A8C4",nm:"Turquoise Bright Dk"},{n:"3845",c:"#04C4C8",nm:"Turquoise Bright Md"},{n:"3846",c:"#06E0E0",nm:"Turquoise Bright Lt"},
+    {n:"597",c:"#5BB3B3",nm:"Turquoise"},{n:"598",c:"#8ED4CC",nm:"Turquoise Lt"},{n:"3808",c:"#366870",nm:"Turquoise Ult Vy Dk"},{n:"3809",c:"#3F8F8B",nm:"Turquoise Vy Dk"},
+    {n:"3810",c:"#48A5A5",nm:"Turquoise Dk"},{n:"3811",c:"#B5E0E0",nm:"Turquoise Vy Lt"},
+    {n:"806",c:"#30AAB5",nm:"Peacock Blue Dk"},{n:"807",c:"#64BFC7",nm:"Peacock Blue"},{n:"3765",c:"#349598",nm:"Peacock Blue Vy Dk"},{n:"3766",c:"#99C8C8",nm:"Peacock Blue Lt"},
+    {n:"958",c:"#3EBAA6",nm:"Seagreen Dk"},{n:"959",c:"#59C3B5",nm:"Seagreen Md"},{n:"964",c:"#A9E0D1",nm:"Seagreen Lt"},{n:"3812",c:"#2F9E7A",nm:"Seagreen Vy Dk"},
+    {n:"3847",c:"#348A7C",nm:"Teal Green Dk"},{n:"3848",c:"#5EADA0",nm:"Teal Green Md"},{n:"3849",c:"#52BDA0",nm:"Teal Green Lt"},
+    {n:"3850",c:"#378C84",nm:"Bright Green Dk"},{n:"3851",c:"#49B8A0",nm:"Bright Green Lt"},
+    {n:"500",c:"#04695A",nm:"Blue Green Vy Dk"},{n:"501",c:"#396E5A",nm:"Blue Green Dk"},{n:"502",c:"#5B8D72",nm:"Blue Green"},{n:"503",c:"#7BAF93",nm:"Blue Green Md"},
+    {n:"504",c:"#ACCCB9",nm:"Blue Green Vy Lt"},{n:"505",c:"#33826B",nm:"Jade Green"},{n:"3813",c:"#B0D8C0",nm:"Blue Green Lt"},
+    {n:"561",c:"#2C7B5B",nm:"Jade Vy Dk"},{n:"562",c:"#538F72",nm:"Jade Md"},{n:"563",c:"#8FC4A8",nm:"Jade Lt"},{n:"564",c:"#A7D6BD",nm:"Jade Vy Lt"},
+    {n:"943",c:"#1E9F6E",nm:"Aquamarine Md"},{n:"991",c:"#477B6C",nm:"Aquamarine Dk"},{n:"992",c:"#6FC4AC",nm:"Aquamarine Lt"},{n:"993",c:"#90D4BF",nm:"Aquamarine Vy Lt"},
+    {n:"3814",c:"#508878",nm:"Aquamarine"},{n:"3815",c:"#477858",nm:"Celadon Green Dk"},{n:"3816",c:"#6AA080",nm:"Celadon Green"},{n:"3817",c:"#99C8A8",nm:"Celadon Green Lt"},
+    {n:"163",c:"#4D9B5D",nm:"Celadon Green Md"},{n:"3818",c:"#115030",nm:"Emerald Green Ult Vy Dk"},
+    {n:"909",c:"#197E2B",nm:"Emerald Green Vy Dk"},{n:"910",c:"#188C38",nm:"Emerald Green Dk"},{n:"911",c:"#1E9F43",nm:"Emerald Green Md"},{n:"912",c:"#1FB05A",nm:"Emerald Green Lt"},
+    {n:"913",c:"#71C191",nm:"Nile Green Md"},{n:"954",c:"#88C9A0",nm:"Nile Green"},{n:"955",c:"#A2DBB8",nm:"Nile Green Lt"},{n:"966",c:"#B8DFB4",nm:"Baby Green Md"},
+    {n:"699",c:"#056A14",nm:"Christmas Green"},{n:"700",c:"#077A1C",nm:"Christmas Green Bright"},{n:"701",c:"#239124",nm:"Christmas Green Lt"},{n:"702",c:"#47A737",nm:"Kelly Green"},
+    {n:"703",c:"#7BB950",nm:"Chartreuse"},{n:"704",c:"#A4C538",nm:"Chartreuse Bright Lt"},{n:"907",c:"#C1D82E",nm:"Parrot Green Lt"},
+    {n:"904",c:"#558028",nm:"Parrot Green Vy Dk"},{n:"905",c:"#5E8C23",nm:"Parrot Green Dk"},{n:"906",c:"#7DB833",nm:"Parrot Green Md"},
+    {n:"895",c:"#1B552C",nm:"Hunter Green Vy Dk"},{n:"3345",c:"#1B5326",nm:"Hunter Green Dk"},{n:"3346",c:"#406B2E",nm:"Hunter Green"},{n:"3347",c:"#718F42",nm:"Yellow Green Md"},
+    {n:"3348",c:"#CCDA97",nm:"Yellow Green Lt"},{n:"772",c:"#E1EFB4",nm:"Yellow Green Vy Lt"},
+    {n:"890",c:"#144B2F",nm:"Pistachio Green Ult Dk"},{n:"319",c:"#205E2E",nm:"Pistachio Green Vy Dk"},{n:"367",c:"#618252",nm:"Pistachio Green Dk"},{n:"320",c:"#6BA368",nm:"Pistachio Green Md"},
+    {n:"368",c:"#A6C89B",nm:"Pistachio Green Lt"},{n:"369",c:"#D5EBC8",nm:"Pistachio Green Vy Lt"},{n:"164",c:"#C8DDA4",nm:"Forest Green Lt"},
+    {n:"986",c:"#1C6836",nm:"Forest Green Vy Dk"},{n:"987",c:"#588840",nm:"Forest Green Dk"},{n:"988",c:"#73A64A",nm:"Forest Green Md"},{n:"989",c:"#8FC25E",nm:"Forest Green"},
+    {n:"580",c:"#8C8216",nm:"Moss Green Dk"},{n:"581",c:"#A7A138",nm:"Moss Green"},{n:"165",c:"#EFF4A5",nm:"Moss Green Vy Lt"},{n:"166",c:"#C0C840",nm:"Moss Green Md Lt"},
+    {n:"3819",c:"#E0E068",nm:"Moss Green Lt"},
+    {n:"730",c:"#827318",nm:"Olive Green Vy Dk"},{n:"731",c:"#918225",nm:"Olive Green Dk"},{n:"732",c:"#9D8E29",nm:"Olive Green"},{n:"733",c:"#BCAD46",nm:"Olive Green Md"},
+    {n:"734",c:"#C7BC55",nm:"Olive Green Lt"},
+    {n:"520",c:"#667453",nm:"Fern Green Dk"},{n:"522",c:"#97A67B",nm:"Fern Green"},{n:"523",c:"#9CAE84",nm:"Fern Green Lt"},{n:"524",c:"#C5CDA5",nm:"Fern Green Vy Lt"},
+    {n:"934",c:"#313C26",nm:"Black Avocado Green"},{n:"935",c:"#424F32",nm:"Avocado Green Dk"},{n:"936",c:"#4C5B3A",nm:"Avocado Green Vy Dk"},{n:"937",c:"#527239",nm:"Avocado Green Md"},
+    {n:"3362",c:"#546340",nm:"Pine Green Dk"},{n:"3363",c:"#728B5A",nm:"Pine Green Md"},{n:"3364",c:"#83A262",nm:"Pine Green"},
+    {n:"3011",c:"#898A52",nm:"Khaki Green Dk"},{n:"3012",c:"#A5A55A",nm:"Khaki Green Md"},{n:"3013",c:"#B8B878",nm:"Khaki Green Lt"},
+    {n:"3051",c:"#576036",nm:"Green Gray Dk"},{n:"3052",c:"#889466",nm:"Green Gray Md"},{n:"3053",c:"#9CA880",nm:"Green Gray"},
+    {n:"924",c:"#566C6C",nm:"Gray Green Vy Dk"},{n:"926",c:"#98ACA7",nm:"Gray Green Md"},{n:"927",c:"#BDCCC8",nm:"Gray Green Lt"},{n:"928",c:"#DDE5DF",nm:"Gray Green Vy Lt"},
+    {n:"3768",c:"#6B888C",nm:"Gray Green Dk"},
+    {n:"930",c:"#45617A",nm:"Antique Blue Dk"},{n:"931",c:"#677E90",nm:"Antique Blue Md"},{n:"932",c:"#98AFBC",nm:"Antique Blue Lt"},{n:"3750",c:"#386880",nm:"Antique Blue Vy Dk"},
+    {n:"3752",c:"#C4D0DD",nm:"Antique Blue Vy Lt"},{n:"3753",c:"#DBE5EE",nm:"Antique Blue Ult Vy Lt"},
+    {n:"159",c:"#C7CDE0",nm:"Gray Blue Lt"},{n:"160",c:"#999FAE",nm:"Gray Blue Md"},{n:"161",c:"#767B8B",nm:"Gray Blue"},
+    {n:"535",c:"#636363",nm:"Ash Gray Vy Lt"},{n:"844",c:"#545150",nm:"Beaver Gray Ult Dk"},{n:"645",c:"#6B685F",nm:"Beaver Gray Vy Dk"},{n:"646",c:"#8A877D",nm:"Beaver Gray Dk"},
+    {n:"647",c:"#B0ADA5",nm:"Beaver Gray Md"},{n:"648",c:"#BDB9B1",nm:"Beaver Gray Lt"},{n:"3072",c:"#E6E6E0",nm:"Beaver Gray Vy Lt"},
+    {n:"640",c:"#8C8271",nm:"Beige Gray Vy Dk"},{n:"642",c:"#A89E8C",nm:"Beige Gray Dk"},{n:"644",c:"#D1C8B5",nm:"Beige Gray Md"},{n:"822",c:"#E8DCC8",nm:"Beige Gray Lt"},
+    {n:"3790",c:"#785C44",nm:"Beige Gray Ult Dk"},
+    {n:"838",c:"#4B3418",nm:"Beige Brown Vy Dk"},{n:"839",c:"#5F421E",nm:"Beige Brown Dk"},{n:"840",c:"#8A6E44",nm:"Beige Brown Md"},{n:"841",c:"#A98E5E",nm:"Beige Brown Lt"},
+    {n:"842",c:"#C8B588",nm:"Beige Brown Vy Lt"},
+    {n:"610",c:"#7F6838",nm:"Drab Brown Dk"},{n:"611",c:"#967944",nm:"Drab Brown"},{n:"612",c:"#BC9D65",nm:"Drab Brown Lt"},{n:"613",c:"#D6C29A",nm:"Drab Brown Vy Lt"},
+    {n:"632",c:"#8A5038",nm:"Desert Sand Ult Vy Dk"},{n:"779",c:"#6B503C",nm:"Cocoa Brown Dk"},
+    {n:"3781",c:"#6B5840",nm:"Mocha Brown Dk"},{n:"3782",c:"#C8AA84",nm:"Mocha Brown Lt"},{n:"3787",c:"#685C4C",nm:"Brown Gray Dk"},
+    {n:"3021",c:"#4F3E28",nm:"Brown Gray Vy Dk"},{n:"3022",c:"#8E8B72",nm:"Brown Gray Md"},{n:"3023",c:"#B0A98C",nm:"Brown Gray Lt"},{n:"3024",c:"#C8C4B4",nm:"Brown Gray Vy Lt"},
+    {n:"3031",c:"#4B3620",nm:"Mocha Brown Vy Dk"},{n:"3032",c:"#B7A58C",nm:"Mocha Brown Md"},{n:"3033",c:"#E3D5B8",nm:"Mocha Brown Vy Lt"},
+    {n:"3862",c:"#8A6A38",nm:"Mocha Beige Dk"},{n:"3863",c:"#A88C60",nm:"Mocha Beige Md"},{n:"3864",c:"#CBB890",nm:"Mocha Beige Lt"},
+    {n:"3045",c:"#BC8E4B",nm:"Yellow Beige Dk"},{n:"3046",c:"#D8BC6C",nm:"Yellow Beige Md"},{n:"3047",c:"#E7D39C",nm:"Yellow Beige Lt"},{n:"167",c:"#A77B4A",nm:"Yellow Beige Vy Dk"},
+    {n:"3078",c:"#FDF3BB",nm:"Golden Yellow Vy Lt"},{n:"677",c:"#F5E8B5",nm:"Old Gold Vy Lt"},{n:"745",c:"#FFF0B5",nm:"Yellow Lt Pale"},{n:"3823",c:"#FFF4C8",nm:"Yellow Ult Pale"},
+    {n:"370",c:"#B8A56A",nm:"Mustard Md"},{n:"371",c:"#BFB276",nm:"Mustard"},{n:"372",c:"#CCBD83",nm:"Mustard Lt"},
+    {n:"829",c:"#7E6B28",nm:"Golden Olive Vy Dk"},{n:"830",c:"#8D7D2A",nm:"Golden Olive Dk"},{n:"831",c:"#AA9130",nm:"Golden Olive Md"},{n:"832",c:"#BCA038",nm:"Golden Olive"},
+    {n:"833",c:"#C9AD3C",nm:"Golden Olive Lt"},{n:"834",c:"#DABD48",nm:"Golden Olive Vy Lt"},
+    {n:"918",c:"#824020",nm:"Red Copper Dk"},{n:"919",c:"#A64E22",nm:"Red Copper"},{n:"920",c:"#AC5B28",nm:"Copper Md"},{n:"921",c:"#C66E32",nm:"Copper"},
+    {n:"922",c:"#E08044",nm:"Copper Lt"},
+    {n:"3853",c:"#F29848",nm:"Autumn Gold Dk"},{n:"3854",c:"#F2B878",nm:"Autumn Gold Md"},{n:"3855",c:"#FAD8A0",nm:"Autumn Gold Lt"},
+    {n:"3856",c:"#FFD0A0",nm:"Mahogany Ult Vy Lt"},{n:"3776",c:"#CC7830",nm:"Mahogany Lt"},{n:"3829",c:"#AA7B12",nm:"Old Gold Vy Dk"},
+    {n:"3857",c:"#6C3420",nm:"Rosewood Dk"},{n:"3858",c:"#964040",nm:"Rosewood Md"},{n:"3859",c:"#BA8878",nm:"Rosewood Lt"},{n:"3779",c:"#F8A890",nm:"Rosewood Vy Lt"},
+    {n:"3860",c:"#6C586C",nm:"Cocoa"},{n:"3861",c:"#A88C98",nm:"Cocoa Lt"},
+    {n:"3865",c:"#FAFAF2",nm:"Winter White"},{n:"3866",c:"#F5EDE0",nm:"Mocha Brown Ult Vy Lt"},
+    {n:"168",c:"#D1D1CE",nm:"Pewter Vy Lt"},{n:"169",c:"#848484",nm:"Pewter Lt"},
+    {n:"162",c:"#DBE8F4",nm:"Blue Ult Vy Lt"},{n:"747",c:"#E5F5F5",nm:"Sky Blue Vy Lt"},
+    {n:"3825",c:"#FBB88C",nm:"Pumpkin Pale"},
+    {n:"3721",c:"#A04050",nm:"Shell Pink Dk"},{n:"3722",c:"#BC6460",nm:"Shell Pink Md"},
+    {n:"3731",c:"#E57888",nm:"Dusty Rose Vy Dk2"},{n:"3733",c:"#E8879C",nm:"Dusty Rose"},
+    {n:"3716",c:"#FFBDC1",nm:"Dusty Rose Md Vy Lt"},
+    {n:"780",c:"#9D7312",nm:"Topaz Ult Vy Dk"},{n:"781",c:"#A87E0E",nm:"Topaz Vy Dk"},{n:"782",c:"#BA8F0F",nm:"Topaz Dk2"},
+    {n:"727",c:"#FFF1AF",nm:"Topaz Vy Lt"},{n:"728",c:"#E4B85C",nm:"Topaz Dk"},
+    {n:"868",c:"#A67440",nm:"Hazel Nut Brown Vy Dk"},
+    {n:"B5200",c:"#FDFDFD",nm:"Snow White"},
   ];
   const PIXEL_COLORS=PIXEL_PALETTE.map(p=>p.c);
+  // 36-color curated DMC subset for image-to-pixel conversion (broad spectrum coverage, manageable thread count)
+  const DMC_CORE_36=[
+    "310","414","318","762","Blanc","Ecru",       // black → grays → white
+    "321","498","606","740","743","973",           // red, dark red, bright orange, tangerine, yellow, canary
+    "725","300","433","436","738","3371",          // gold, mahogany, brown, tan, light tan, black brown
+    "335","956","818","550","208","3607",          // rose, geranium, baby pink, violet dk, lavender, plum lt
+    "336","797","826","519","996","3846",          // navy, royal blue, blue med, sky blue, electric blue, turquoise
+    "699","702","909","955","320","895"            // green, kelly green, emerald dk, nile green lt, pistachio, hunter dk
+  ];
+  const DMC_CONVERT_PALETTE=DMC_CORE_36.map(n=>PIXEL_PALETTE.find(p=>p.n===n)).filter(Boolean);
   const PIXEL_SIZES=[{id:"16x16",label:"16×16",desc:"Icon",c:16,r:16},{id:"32x32",label:"32×32",desc:"Sprite",c:32,r:32},{id:"48x48",label:"48×48",desc:"Detailed",c:48,r:48},{id:"64x64",label:"64×64",desc:"Large",c:64,r:64},{id:"128x128",label:"128×128",desc:"HD",c:128,r:128},{id:"256x256",label:"256×256",desc:"Full",c:256,r:256},{id:"512x512",label:"512×512",desc:"Max",c:512,r:512}];
   const[pixelGridLines,setPixelGridLines]=useState(0);
   const[customPixelW,setCustomPixelW]=useState("100");
   const[customPixelH,setCustomPixelH]=useState("100");
   const[showPixNumbers,setShowPixNumbers]=useState(false);
   const[showPixPicker,setShowPixPicker]=useState(false);
+  const[pixPaletteSearch,setPixPaletteSearch]=useState("");
   const[pixCustomLabels,setPixCustomLabels]=useState(()=>{try{return JSON.parse(localStorage.getItem("zobuddy_pix_labels"))||{};}catch{return{};}});
   const savePixLabels=(l)=>{setPixCustomLabels(l);try{localStorage.setItem("zobuddy_pix_labels",JSON.stringify(l));}catch{}};
   const getPixels=()=>{const d=readNb();return d.pages?.[nbPageIdx]?.pixels||{};};
@@ -6189,7 +6320,7 @@ const NotebookPanel=()=>{
     // Open in new window for printing
     const dataUrl=tc.toDataURL("image/png");
     const win=window.open("","_blank");
-    if(win){win.document.write(`<html><head><title>Pixel Art - Paint by Number</title><style>@media print{body{margin:0}img{width:100%;height:auto;}}</style></head><body style="margin:0;background:#fff;display:flex;flex-direction:column;align-items:center;padding:8px"><h3 style="margin:4px 0;font-family:sans-serif">${nbData.pages[nbPageIdx]?.title||"Pixel Art"} — Paint by Number</h3><img src="${dataUrl}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-family:sans-serif;font-size:11px;display:flex;flex-wrap:wrap;gap:8px">${PIXEL_PALETTE.map(p=>`<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:14px;height:14px;border-radius:3px;background:${p.c};border:1px solid #ccc;display:inline-block"></span><b>${p.n}</b> ${p.nm}</span>`).join("")}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:8px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}
+    if(win){const usedColors=new Set(Object.values(pixels));const usedPalette=PIXEL_PALETTE.filter(p=>usedColors.has(p.c));win.document.write(`<html><head><title>Pixel Art - Paint by Number</title><style>@media print{body{margin:0}img{width:100%;height:auto;}}</style></head><body style="margin:0;background:#fff;display:flex;flex-direction:column;align-items:center;padding:8px"><h3 style="margin:4px 0;font-family:sans-serif">${nbData.pages[nbPageIdx]?.title||"Pixel Art"} — Paint by Number</h3><img src="${dataUrl}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-family:sans-serif;font-size:11px;display:flex;flex-wrap:wrap;gap:8px">${usedPalette.map(p=>`<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:14px;height:14px;border-radius:3px;background:${p.c};border:1px solid #ccc;display:inline-block"></span><b>DMC ${p.n}</b> ${p.nm}</span>`).join("")}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:8px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}
   };
   // ─── IMAGE TO PIXEL ART ────────────────────────────────────────
   const[pixImporting,setPixImporting]=useState(false);
@@ -6213,9 +6344,21 @@ const NotebookPanel=()=>{
       const rgbToHex=(r,g,b)=>"#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("");
       const newPixels={};
       if(useFullColor){for(let row=0;row<dims.r;row++)for(let col=0;col<dims.c;col++){const idx=(row*dims.c+col)*4;const r=data[idx],g=data[idx+1],b=data[idx+2],a=data[idx+3];if(a<30)continue;newPixels[`${row}-${col}`]=rgbToHex(r,g,b);}
-      }else{const pal=PIXEL_PALETTE.map(p=>p.c);const htr=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];const palRgb=pal.map(htr);
-        const near=(r,g,b)=>{let bi=0,bd=Infinity;palRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return pal[bi];};
-        for(let row=0;row<dims.r;row++)for(let col=0;col<dims.c;col++){const idx=(row*dims.c+col)*4;const r=data[idx],g=data[idx+1],b=data[idx+2],a=data[idx+3];if(a<30)continue;newPixels[`${row}-${col}`]=near(r,g,b);}}
+      }else{
+        // Dynamic 36-color selection: find best 36 DMC threads for THIS image
+        const htr=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+        const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
+        const nearFull=(r,g,b)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
+        // Pass 1: tally which DMC colors the image needs most
+        const votes=new Map();
+        for(let row=0;row<dims.r;row++)for(let col=0;col<dims.c;col++){const idx=(row*dims.c+col)*4;const a=data[idx+3];if(a<30)continue;
+          const bi=nearFull(data[idx],data[idx+1],data[idx+2]);votes.set(bi,(votes.get(bi)||0)+1);}
+        // Pick top 36 most-voted DMC colors
+        const top36=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,36).map(e=>e[0]);
+        const subPal=top36.map(i=>fullPal[i]);const subRgb=top36.map(i=>fullRgb[i]);
+        const nearSub=(r,g,b)=>{let bi=0,bd=Infinity;subRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return subPal[bi];};
+        // Pass 2: map every pixel to the nearest in top-36 subset
+        for(let row=0;row<dims.r;row++)for(let col=0;col<dims.c;col++){const idx=(row*dims.c+col)*4;const r=data[idx],g=data[idx+1],b=data[idx+2],a=data[idx+3];if(a<30)continue;newPixels[`${row}-${col}`]=nearSub(r,g,b);}}
       const d=readNb();const pi=pageIdxRef.current;
       if(d.pages?.[pi]){d.pages[pi].pixels=newPixels;
         try{writeNb(d);setNbData({...d});}catch(e){alert("Save failed: "+e.message);}
@@ -6438,20 +6581,24 @@ const NotebookPanel=()=>{
         <span style={{fontSize:11,opacity:.4,minWidth:32,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
         <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={btn({padding:"4px 8px"})}>+</button>
         <div style={{width:1,height:20,background:"rgba(255,255,255,.1)",margin:"0 2px"}}/>
-        {PIXEL_COLORS.slice(0,12).map(c=>(<div key={c} onClick={()=>{setPixelColor(c);setPixelEraser(false);}} style={{width:20,height:20,borderRadius:4,background:c,border:pixelColor===c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",opacity:pixelEraser?.4:1}}/>))}
+        {DMC_CONVERT_PALETTE.slice(0,12).map(p=>(<div key={p.c} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} style={{width:20,height:20,borderRadius:4,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",opacity:pixelEraser?.4:1}}/>))}
         <button onClick={()=>setShowPixPicker(v=>!v)} style={btn({padding:"4px 6px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>🎨</button>
         <div style={{flex:1}}/>
         <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗃️</button>
         <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗑️</button>
       </div>
-      {/* Full 36-color picker */}
+      {/* Full DMC color picker */}
       {showPixPicker&&<div style={{padding:"4px 10px 6px",flexShrink:0}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(9,1fr)",gap:2}}>
-          {PIXEL_PALETTE.map(p=>(<div key={p.n} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} style={{position:"relative",aspectRatio:"1",borderRadius:4,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <span style={{fontSize:8,fontWeight:700,color:(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)>128?"#000":"#fff",opacity:.7}}>{p.n}</span>
+        <input value={pixPaletteSearch} onChange={e=>setPixPaletteSearch(e.target.value)} placeholder="Search DMC # or color name..." style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#e8e0f0",fontSize:11,outline:"none",marginBottom:4,boxSizing:"border-box"}}/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(12,1fr)",gap:2,maxHeight:180,overflowY:"auto",overflowX:"hidden"}}>
+          {(pixPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=pixPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>(<div key={p.n+p.c} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} — ${p.nm}`} style={{position:"relative",aspectRatio:"1",borderRadius:3,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minWidth:0}}>
+            <span style={{fontSize:6,fontWeight:700,color:(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)>128?"rgba(0,0,0,.5)":"rgba(255,255,255,.6)",lineHeight:1,textAlign:"center",overflow:"hidden"}}>{p.n}</span>
           </div>))}
         </div>
-        <div style={{fontSize:10,opacity:.3,marginTop:4,textAlign:"center"}}>{PIXEL_PALETTE.find(p=>p.c===pixelColor)?.nm||"Custom"} ({PIXEL_PALETTE.find(p=>p.c===pixelColor)?.n||"—"})</div>
+        <div style={{fontSize:10,marginTop:4,textAlign:"center",color:"rgba(232,224,240,.5)"}}>
+          <span style={{fontWeight:700}}>DMC {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.n||"—"}</span>
+          <span style={{opacity:.6}}> — {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.nm||"Custom"}</span>
+        </div>
       </div>}
       <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
         <button onClick={()=>{if(!confirm("Clear all?"))return;const d=readNb();if(d.pages?.[nbPageIdx]){d.pages[nbPageIdx].pixels={};writeNb(d);drawPixelGrid();}}}
@@ -6467,6 +6614,19 @@ const NotebookPanel=()=>{
         {[{v:0,l:"Off"},{v:5,l:"5×5"},{v:10,l:"10×10"},{v:20,l:"20×20"}].map(g=>(
           <button key={g.v} onClick={()=>setPixelGridLines(g.v)} style={{padding:"2px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:pixelGridLines===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:pixelGridLines===g.v?"rgba(254,202,87,.12)":"transparent",color:pixelGridLines===g.v?"#feca57":"#666",cursor:"pointer"}}>{g.l}</button>))}
       </div>
+      {/* Thread list for pixel art — shows used DMC colors with thread info for purchasing */}
+      {showPixPicker&&(()=>{const pixels=getPixels();const usedHexes=[...new Set(Object.values(pixels))];const usedDmc=usedHexes.map(h=>PIXEL_PALETTE.find(p=>p.c===h)).filter(Boolean).sort((a,b)=>String(a.n).localeCompare(String(b.n),undefined,{numeric:true}));
+        return usedDmc.length>0?<div style={{padding:"2px 10px 6px",flexShrink:0}}>
+          <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 Thread List ({usedDmc.length} colors used)</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:3,maxHeight:100,overflowY:"auto"}}>
+            {usedDmc.map(p=><div key={p.n} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.04)",borderRadius:5,padding:"2px 6px"}}>
+              <div style={{width:10,height:10,borderRadius:2,background:p.c,border:"1px solid rgba(255,255,255,.15)",flexShrink:0}}/>
+              <span style={{fontSize:9,color:"#e8e0f0",fontWeight:700}}>DMC {p.n}</span>
+              <span style={{fontSize:9,color:"rgba(232,224,240,.4)"}}>{p.nm}</span>
+            </div>)}
+          </div>
+        </div>:null;
+      })()}
       {/* Image crop UI */}
       {pixImgCrop&&(()=>{
         const dims=getPixelDims();const gridRatio=dims.c/dims.r;
