@@ -6987,6 +6987,7 @@ const NotebookPanel=()=>{
       }catch(err){alert("Error: "+err.message);callback(null);}
     };img.src=imgSrc;
   };
+  const vecSvgRef=React.useRef(""); // keep full SVG in memory only (not localStorage)
   const vecConvert=(paletteLimit)=>{
     vecFileRef.current?.click();
     const handler=(e)=>{
@@ -6996,16 +6997,31 @@ const NotebookPanel=()=>{
         traceImageToSvg(ev.target.result,paletteLimit,(result)=>{
           setVecImporting(false);
           if(!result)return;
-          const d=readNb();const pi=pageIdxRef.current;
-          if(d.pages?.[pi]){
-            d.pages[pi].vectorSvg=result.svg;
-            d.pages[pi].vectorColors=result.colors;
-            writeNb(d);setNbData({...d});
-          }
+          vecSvgRef.current=result.svg;
+          // Convert SVG to PNG data URL for compact localStorage storage
+          const svgBlob=new Blob([result.svg],{type:"image/svg+xml"});
+          const url=URL.createObjectURL(svgBlob);
+          const img2=new Image();
+          img2.onload=()=>{
+            const c2=document.createElement("canvas");c2.width=result.width*2;c2.height=result.height*2;
+            const ctx2=c2.getContext("2d");ctx2.fillStyle="#fff";ctx2.fillRect(0,0,c2.width,c2.height);
+            ctx2.drawImage(img2,0,0,c2.width,c2.height);
+            const pngUrl=c2.toDataURL("image/jpeg",0.85);
+            URL.revokeObjectURL(url);
+            const d=readNb();const pi=pageIdxRef.current;
+            if(d.pages?.[pi]){
+              d.pages[pi].vectorPng=pngUrl;
+              d.pages[pi].vectorColors=result.colors;
+              // Don't store full SVG in localStorage — too large
+              delete d.pages[pi].vectorSvg;
+              try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — image may be too large. Try fewer colors.");}
+            }
+          };
+          img2.onerror=()=>{URL.revokeObjectURL(url);alert("Failed to render SVG preview");};
+          img2.src=url;
         });
       };reader.readAsDataURL(file);
     };
-    // One-time handler
     const input=vecFileRef.current;
     if(input){input.onchange=handler;}
   };
@@ -7014,8 +7030,10 @@ const NotebookPanel=()=>{
   if(nbView==="page"&&nbData.pages[nbPageIdx]?.type==="vector"){
     const page=nbData.pages[nbPageIdx];
     const hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
-    const vecSvg=page.vectorSvg||"";
+    const vecSvg=vecSvgRef.current||page.vectorSvg||"";
+    const vecPng=page.vectorPng||"";
     const vecColors=page.vectorColors||[];
+    const hasVecContent=vecSvg||vecPng;
     return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <input ref={vecFileRef} type="file" accept="image/*" style={{display:"none"}}/>
       {/* Row 1: nav */}
@@ -7058,10 +7076,11 @@ const NotebookPanel=()=>{
       <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
         <button onClick={()=>{setVecShowPicker(v=>!v);setVecPaletteSearch("");}} style={btn({padding:"3px 7px",fontSize:10,color:vecShowPicker?"#feca57":"#888"})}>{vecShowPicker?"▼ Palette":"🎨 Palette"}</button>
         <div style={{flex:1}}/>
-        {vecSvg&&<button onClick={()=>{
+        {hasVecContent&&<button onClick={()=>{
           const win=window.open("","_blank");
           if(win){const legendHtml=vecColors.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-block"></span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""} <span style="color:#888">(${c.count}px)</span></span>`).join("");
-            win.document.write(`<html><head><title>${page.title||"Vector Art"}</title><style>@media print{body{margin:0}}</style></head><body style="margin:0;background:#fff;display:flex;flex-direction:column;align-items:center;padding:12px"><h3 style="margin:4px 0;font-family:sans-serif">${page.title||"Vector Art"}</h3><div style="max-width:100%;overflow:auto">${vecSvg}</div><div style="margin:8px 0;font-family:sans-serif;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:8px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}
+            const imgHtml=vecSvg?`<div style="max-width:100%;overflow:auto">${vecSvg}</div>`:`<img src="${vecPng}" style="max-width:100%;height:auto"/>`;
+            win.document.write(`<html><head><title>${page.title||"Vector Art"}</title><style>@media print{body{margin:0}}</style></head><body style="margin:0;background:#fff;display:flex;flex-direction:column;align-items:center;padding:12px"><h3 style="margin:4px 0;font-family:sans-serif">${page.title||"Vector Art"}</h3>${imgHtml}<div style="margin:8px 0;font-family:sans-serif;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:8px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}
         }} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>}
         {vecSvg&&<button onClick={()=>{const blob=new Blob([vecSvg],{type:"image/svg+xml"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(page.title||"vector")+".svg";a.click();URL.revokeObjectURL(url);}}
           style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 SVG</button>}
@@ -7088,9 +7107,10 @@ const NotebookPanel=()=>{
           </div>)}
         </div>
       </div>}
-      {/* SVG display */}
+      {/* Image display */}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:12}}>
         {vecSvg?<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top center"}} dangerouslySetInnerHTML={{__html:vecSvg}}/>
+        :vecPng?<img src={vecPng} style={{transform:`scale(${pageZoom})`,transformOrigin:"top center",maxWidth:"100%",height:"auto",borderRadius:4}}/>
         :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
           <div style={{fontSize:48,marginBottom:12}}>✏️</div>
           <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert to vector art</div>
