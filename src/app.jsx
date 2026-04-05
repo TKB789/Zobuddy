@@ -7088,7 +7088,7 @@ const NotebookPanel=()=>{
           const imgSrc=vecPng;if(!imgSrc)return;
           const legendHtml=vecColors.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-block"></span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""} <span style="color:#888">(${c.count}px)</span></span>`).join("");
           const win=window.open("","_blank");
-          if(win){win.document.write(`<html><head><title>${page.title||"Vector Art"}</title><style>@media print{body{margin:0}.no-print{display:none}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${page.title||"Vector Art"}</h3><img src="${imgSrc}"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print" style="margin:8px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+          if(win){win.document.write(`<html><head><title>${page.title||"Paint by Number"}</title><style>@media print{body{margin:0}.no-print{display:none}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${page.title||"Paint by Number"}</h3><img src="${imgSrc}"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print" style="margin:8px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
         }} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>}
         {hasVecContent&&<button onClick={()=>{
           const imgSrc=vecPng;if(!imgSrc)return;
@@ -7102,7 +7102,7 @@ const NotebookPanel=()=>{
             tilesHtml+=`<div style="page-break-after:always;width:100vw;height:100vh;overflow:hidden;position:relative;box-sizing:border-box;border:1px solid #eee"><div style="position:absolute;top:4px;left:4px;font-size:10px;color:#888;z-index:1">Page ${row*n+col+1}/${n*n} (R${row+1}C${col+1})</div><img src="${imgSrc}" style="position:absolute;left:${offX}%;top:${offY}%;width:${pctW}%;height:${pctH}%;object-fit:fill"/></div>`;
           }
           const win=window.open("","_blank");
-          if(win){win.document.write(`<html><head><title>${page.title||"Vector Art"} - ${n}×${n} Tiled</title><style>@media print{body{margin:0}.no-print{display:none}}body{margin:0;padding:0}</style></head><body>${tilesHtml}<div class="no-print" style="padding:12px;text-align:center"><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center">${legendHtml}</div><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print ${n}×${n} Pages / Save PDF</button></div></body></html>`);win.document.close();}
+          if(win){win.document.write(`<html><head><title>${page.title||"Paint by Number"} - ${n}×${n} Tiled</title><style>@media print{body{margin:0}.no-print{display:none}}body{margin:0;padding:0}</style></head><body>${tilesHtml}<div class="no-print" style="padding:12px;text-align:center"><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center">${legendHtml}</div><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print ${n}×${n} Pages / Save PDF</button></div></body></html>`);win.document.close();}
         }} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Multi-Page</button>}
         {vecSvg&&<button onClick={()=>{const blob=new Blob([vecSvg],{type:"image/svg+xml"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(page.title||"vector")+".svg";a.click();URL.revokeObjectURL(url);}}
           style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 SVG</button>}
@@ -7129,28 +7129,40 @@ const NotebookPanel=()=>{
         </div>}
       </div>}
       {/* Crop UI */}
-      {vecCropImg&&<div style={{position:"absolute",inset:0,zIndex:100,background:"rgba(0,0,0,.85)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{fontSize:16,fontWeight:800,color:"#e8e0f0",marginBottom:4}}>Drag to select area</div>
-        <div style={{fontSize:12,color:"#888",marginBottom:8}}>Pinch or use slider to resize</div>
-        <div style={{position:"relative",width:280,maxHeight:280,marginBottom:8}} onPointerMove={(e)=>{if(e.buttons){const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;setVecCropBox(b=>({...b,x:Math.max(0,Math.min(100-b.w,px-b.w/2)),y:Math.max(0,Math.min(100-b.h,py-b.h/2))}));}}}>
-          <img src={vecCropImg} style={{width:"100%",height:"auto",borderRadius:8,display:"block"}}/>
-          <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:`${vecCropBox.x}%`,width:`${vecCropBox.w}%`,height:`${vecCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:4}}/>
-          <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
-            <div style={{position:"absolute",top:0,left:0,right:0,height:`${vecCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
-            <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-vecCropBox.y-vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-            <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:0,width:`${vecCropBox.x}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-            <div style={{position:"absolute",top:`${vecCropBox.y}%`,right:0,width:`${100-vecCropBox.x-vecCropBox.w}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+      {vecCropImg&&<div style={{position:"absolute",inset:0,zIndex:100,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",overflow:"auto"}}>
+        <div style={{padding:"12px 16px",flexShrink:0}}>
+          <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0",marginBottom:2}}>Select area</div>
+          <div style={{fontSize:11,color:"#888",marginBottom:8}}>Drag to move, use sliders to resize</div>
+        </div>
+        <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",padding:"0 16px"}}>
+          <div style={{position:"relative",width:"100%",maxWidth:300}} onPointerMove={(e)=>{if(e.buttons){const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;setVecCropBox(b=>({...b,x:Math.max(0,Math.min(100-b.w,px-b.w/2)),y:Math.max(0,Math.min(100-b.h,py-b.h/2))}));}}}>
+            <img src={vecCropImg} style={{width:"100%",height:"auto",borderRadius:6,display:"block"}}/>
+            <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:`${vecCropBox.x}%`,width:`${vecCropBox.w}%`,height:`${vecCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:3}}/>
+            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:`${vecCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-vecCropBox.y-vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:0,width:`${vecCropBox.x}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",top:`${vecCropBox.y}%`,right:0,width:`${100-vecCropBox.x-vecCropBox.w}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+            </div>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,width:260}}>
-          <span style={{fontSize:11,color:"#feca57",fontWeight:700,flexShrink:0}}>Size</span>
-          <input type="range" min="20" max="100" value={vecCropBox.w} onChange={(e)=>{const nw=Number(e.target.value);setVecCropBox(p=>{const nh=Math.min(100,nw);return{...p,w:nw,h:nh,x:Math.min(p.x,100-nw),y:Math.min(p.y,100-nh)};});}}
-            style={{flex:1,accentColor:"#feca57",filter:"contrast(1.3)"}}/>
-          <span style={{fontSize:12,color:"#feca57",fontWeight:800,minWidth:36,textAlign:"right"}}>{Math.round(vecCropBox.w)}%</span>
-        </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={vecConfirmCrop} style={{padding:"10px 24px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:15,fontWeight:700,cursor:"pointer"}}>Convert</button>
-          <button onClick={()=>setVecCropImg(null)} style={{padding:"10px 24px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+        <div style={{padding:"10px 16px",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+            <span style={{fontSize:11,color:"#feca57",fontWeight:700,minWidth:40}}>Width</span>
+            <input type="range" min="10" max="100" value={vecCropBox.w} onChange={(e)=>{const nw=Number(e.target.value);setVecCropBox(p=>({...p,w:nw,x:Math.min(p.x,100-nw)}));}}
+              style={{flex:1,accentColor:"#feca57",filter:"contrast(1.3)"}}/>
+            <span style={{fontSize:11,color:"#feca57",fontWeight:800,minWidth:32,textAlign:"right"}}>{Math.round(vecCropBox.w)}%</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <span style={{fontSize:11,color:"#feca57",fontWeight:700,minWidth:40}}>Height</span>
+            <input type="range" min="10" max="100" value={vecCropBox.h} onChange={(e)=>{const nh=Number(e.target.value);setVecCropBox(p=>({...p,h:nh,y:Math.min(p.y,100-nh)}));}}
+              style={{flex:1,accentColor:"#feca57",filter:"contrast(1.3)"}}/>
+            <span style={{fontSize:11,color:"#feca57",fontWeight:800,minWidth:32,textAlign:"right"}}>{Math.round(vecCropBox.h)}%</span>
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+            <button onClick={vecConfirmCrop} style={{padding:"10px 28px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:15,fontWeight:700,cursor:"pointer"}}>Convert</button>
+            <button onClick={()=>setVecCropImg(null)} style={{padding:"10px 28px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+          </div>
         </div>
       </div>}
       {/* Draw toolbar for vector overlay */}
@@ -7336,7 +7348,7 @@ const NotebookPanel=()=>{
     <div style={{background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
       <input value={nbNewTitle} onChange={e=>setNbNewTitle(e.target.value)} placeholder="Page title" style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none",marginBottom:6}}/>
       <div style={{display:"flex",gap:4,marginBottom:6}}>
-        {[{id:"lined",label:"📝 Note"},{id:"pixel",label:"🟨 Pixel Art"},{id:"vector",label:"✏️ Vector Art"}].map(t=>(
+        {[{id:"lined",label:"📝 Note"},{id:"pixel",label:"🟨 Pixel Art"},{id:"vector",label:"🎨 Paint by Number"}].map(t=>(
           <button key={t.id} onClick={()=>setNbNewType(t.id)}
             style={{flex:1,padding:"7px 2px",borderRadius:8,border:nbNewType===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.08)",
               background:nbNewType===t.id?"rgba(102,126,234,.15)":"rgba(255,255,255,.03)",color:nbNewType===t.id?"#a8b4f0":"#888",fontSize:12,fontWeight:700,cursor:"pointer"}}>{t.label}</button>))}
@@ -7379,7 +7391,7 @@ const NotebookPanel=()=>{
           <span style={{fontSize:13,fontWeight:800,color:"rgba(102,126,234,.6)",minWidth:28}}>{i+1}.</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title||"Untitled"}</div>
-            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):p.type==="vector"?"✏️ Vector Art":`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
+            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):p.type==="vector"?"🎨 Paint by Number":`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
           {nbPreviewMode&&<span style={{fontSize:14,opacity:.3,transition:"transform .2s",transform:isExpanded?"rotate(90deg)":"none"}}>▶</span>}
         </div>
         {isExpanded&&<div onClick={openPage} style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",cursor:"pointer"}}>
