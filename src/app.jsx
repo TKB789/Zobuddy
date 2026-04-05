@@ -5990,6 +5990,11 @@ const NotebookPanel=()=>{
   const[drawPaletteSearch,setDrawPaletteSearch]=useState("");
   const[pixelColor,setPixelColor]=useState("#f5576c");
   const[pixelEraser,setPixelEraser]=useState(false);
+  // Vector art state
+  const[vecImporting,setVecImporting]=useState(false);
+  const[vecShowPicker,setVecShowPicker]=useState(false);
+  const[vecPaletteSearch,setVecPaletteSearch]=useState("");
+  const vecFileRef=React.useRef(null);
   const[saved,setSaved]=useState(false);
   const[renaming,setRenaming]=useState(false);
   const[renameVal,setRenameVal]=useState("");
@@ -6885,8 +6890,191 @@ const NotebookPanel=()=>{
         </div></div></div>);
   }
 
+  // ═══ VECTOR ART ENGINE ═══
+  // Bitmap-to-SVG: quantize colors to DMC palette, then trace each color region into SVG paths
+  const traceImageToSvg=(imgSrc,colorCount,callback)=>{
+    const img=new Image();
+    img.onerror=()=>{alert("Failed to load image");callback(null);};
+    img.onload=()=>{
+      try{
+      // Scale down for performance (max 256px on longest side)
+      const maxDim=256;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      const tc=document.createElement("canvas");tc.width=w;tc.height=h;
+      const tctx=tc.getContext("2d");tctx.drawImage(img,0,0,w,h);
+      const data=tctx.getImageData(0,0,w,h).data;
+      // Quantize to DMC palette
+      const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+      const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
+      const nearFull=(r,g,b)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
+      // Build quantized grid
+      const grid=new Uint16Array(w*h);
+      const votes=new Map();
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const idx=(y*w+x)*4;const a=data[idx+3];
+        if(a<30){grid[y*w+x]=65535;continue;}
+        const bi=nearFull(data[idx],data[idx+1],data[idx+2]);
+        grid[y*w+x]=bi;votes.set(bi,(votes.get(bi)||0)+1);
+      }
+      // Pick top N colors
+      const topN=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,colorCount===0?votes.size:colorCount);
+      const allowedSet=new Set(topN.map(e=>e[0]));
+      // Remap to nearest allowed color
+      const remap=new Uint16Array(fullPal.length);
+      for(let i=0;i<fullPal.length;i++){
+        if(allowedSet.has(i)){remap[i]=i;continue;}
+        let bd=Infinity,bi=topN[0][0];
+        const[r,g,b]=fullRgb[i];
+        topN.forEach(([ci])=>{const[pr,pg,pb]=fullRgb[ci];const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=ci;}});
+        remap[i]=bi;
+      }
+      for(let i=0;i<grid.length;i++){if(grid[i]!==65535)grid[i]=remap[grid[i]];}
+      // Trace each color into SVG path using simple contour tracing
+      const usedColors=[...new Set(Array.from(grid).filter(v=>v!==65535))];
+      let paths="";
+      usedColors.forEach(ci=>{
+        // Create binary mask for this color
+        const mask=new Uint8Array((w+2)*(h+2)); // padded by 1px border
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+          if(grid[y*w+x]===ci)mask[(y+1)*(w+2)+(x+1)]=1;
+        }
+        // Simple raster-to-path: for each cell, add rect (grouped for simplicity)
+        // Use run-length encoding per row for fewer rects
+        for(let y=0;y<h;y++){
+          let x=0;
+          while(x<w){
+            if(grid[y*w+x]===ci){
+              let runEnd=x+1;while(runEnd<w&&grid[y*w+runEnd]===ci)runEnd++;
+              // Merge with rows below if same run
+              let yEnd=y+1;
+              while(yEnd<h){
+                let match=true;
+                for(let xx=x;xx<runEnd;xx++){if(grid[yEnd*w+xx]!==ci){match=false;break;}}
+                // Check nothing extra on sides
+                if(match&&(x>0&&grid[yEnd*w+(x-1)]===ci))match=false;
+                if(match&&(runEnd<w&&grid[yEnd*w+runEnd]===ci))match=false;
+                if(!match)break;
+                yEnd++;
+              }
+              // Mark merged cells as visited by using a temp value
+              paths+=`<rect x="${x}" y="${y}" width="${runEnd-x}" height="${yEnd-y}" fill="${fullPal[ci]}"/>`;
+              for(let yy=y;yy<yEnd;yy++)for(let xx=x;xx<runEnd;xx++)grid[yy*w+xx]=65534;
+              x=runEnd;
+            }else x++;
+          }
+        }
+        // Restore grid for next color (65534 back to ci) — not needed since each color processes independently
+      });
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w*3}" height="${h*3}">${paths}</svg>`;
+      const colorInfo=topN.map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
+      callback({svg,width:w,height:h,colors:colorInfo});
+      }catch(err){alert("Error: "+err.message);callback(null);}
+    };img.src=imgSrc;
+  };
+  const vecConvert=(paletteLimit)=>{
+    vecFileRef.current?.click();
+    const handler=(e)=>{
+      const file=e.target.files?.[0];if(!file)return;e.target.value="";
+      setVecImporting(true);
+      const reader=new FileReader();reader.onload=(ev)=>{
+        traceImageToSvg(ev.target.result,paletteLimit,(result)=>{
+          setVecImporting(false);
+          if(!result)return;
+          const d=readNb();const pi=pageIdxRef.current;
+          if(d.pages?.[pi]){
+            d.pages[pi].vectorSvg=result.svg;
+            d.pages[pi].vectorColors=result.colors;
+            writeNb(d);setNbData({...d});
+          }
+        });
+      };reader.readAsDataURL(file);
+    };
+    // One-time handler
+    const input=vecFileRef.current;
+    if(input){input.onchange=handler;}
+  };
+
+  // ═══ VECTOR PAGE ═══
+  if(nbView==="page"&&nbData.pages[nbPageIdx]?.type==="vector"){
+    const page=nbData.pages[nbPageIdx];
+    const hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
+    const vecSvg=page.vectorSvg||"";
+    const vecColors=page.vectorColors||[];
+    return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <input ref={vecFileRef} type="file" accept="image/*" style={{display:"none"}}/>
+      {/* Row 1: nav */}
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px 4px",flexShrink:0}}>
+        <button onClick={goToc} style={btn()}>←</button>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
+          <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
+          {renaming?<input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
+            onBlur={()=>{if(renameVal.trim()){save("title",renameVal.trim());syncState();}setRenaming(false);}}
+            onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
+            style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:120}}/>
+          :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
+          <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
+        </div>
+        <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>
+      </div>
+      {/* Row 2: import options */}
+      <div style={{display:"flex",alignItems:"center",gap:3,padding:"2px 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Convert:</span>
+        {[{n:8,l:"8"},{n:16,l:"16"},{n:36,l:"36"},{n:0,l:"All"}].map(o=>(
+          <button key={o.n} onClick={()=>vecConvert(o.n)} disabled={vecImporting}
+            style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{vecImporting?"...":"📷"+o.l}</button>))}
+        <div style={{flex:1}}/>
+        <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"3px 7px",fontSize:11})}>−</button>
+        <span style={{fontSize:10,opacity:.4,minWidth:28,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
+        <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={btn({padding:"3px 7px",fontSize:11})}>+</button>
+      </div>
+      {/* Row 3: palette + actions */}
+      <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
+        <button onClick={()=>{setVecShowPicker(v=>!v);setVecPaletteSearch("");}} style={btn({padding:"3px 7px",fontSize:10,color:vecShowPicker?"#feca57":"#888"})}>{vecShowPicker?"▼ Palette":"🎨 Palette"}</button>
+        <div style={{flex:1}}/>
+        {vecSvg&&<button onClick={()=>{
+          const win=window.open("","_blank");
+          if(win){const legendHtml=vecColors.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-block"></span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""} <span style="color:#888">(${c.count}px)</span></span>`).join("");
+            win.document.write(`<html><head><title>${page.title||"Vector Art"}</title><style>@media print{body{margin:0}}</style></head><body style="margin:0;background:#fff;display:flex;flex-direction:column;align-items:center;padding:12px"><h3 style="margin:4px 0;font-family:sans-serif">${page.title||"Vector Art"}</h3><div style="max-width:100%;overflow:auto">${vecSvg}</div><div style="margin:8px 0;font-family:sans-serif;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:8px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}
+        }} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>}
+        {vecSvg&&<button onClick={()=>{const blob=new Blob([vecSvg],{type:"image/svg+xml"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(page.title||"vector")+".svg";a.click();URL.revokeObjectURL(url);}}
+          style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 SVG</button>}
+        <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗃️</button>
+        <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗑️</button>
+      </div>
+      {/* Palette picker */}
+      {vecShowPicker&&<div style={{padding:"4px 10px 6px",flexShrink:0}}>
+        <input value={vecPaletteSearch} onChange={e=>setVecPaletteSearch(e.target.value)} placeholder="Search DMC # or color name..." style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#e8e0f0",fontSize:11,outline:"none",marginBottom:4,boxSizing:"border-box"}}/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(12,1fr)",gap:2,maxHeight:150,overflowY:"auto",overflowX:"hidden"}}>
+          {(vecPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=vecPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>(<div key={p.n+p.c} title={`DMC ${p.n} — ${p.nm}`} style={{aspectRatio:"1",borderRadius:3,background:p.c,border:"1px solid rgba(255,255,255,.12)",minWidth:0}}/>))}
+        </div>
+      </div>}
+      {/* Thread list */}
+      {vecColors.length>0&&<div style={{padding:"2px 10px 6px",flexShrink:0}}>
+        <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 Thread List ({vecColors.length} colors)</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:3,maxHeight:100,overflowY:"auto"}}>
+          {vecColors.map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.04)",borderRadius:5,padding:"2px 6px"}}>
+            <div style={{width:12,height:12,borderRadius:2,background:c.color,border:"1px solid rgba(255,255,255,.15)",flexShrink:0}}/>
+            <span style={{fontSize:9,color:"#feca57",fontWeight:700}}>#{i+1}</span>
+            <span style={{fontSize:9,color:"#e8e0f0",fontWeight:700}}>DMC {c.dmc?.n||"?"}</span>
+            <span style={{fontSize:9,color:"rgba(232,224,240,.4)"}}>{c.dmc?.nm||""}</span>
+            <span style={{fontSize:8,color:"rgba(232,224,240,.3)"}}>({c.count}px)</span>
+          </div>)}
+        </div>
+      </div>}
+      {/* SVG display */}
+      <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:12}}>
+        {vecSvg?<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top center"}} dangerouslySetInnerHTML={{__html:vecSvg}}/>
+        :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
+          <div style={{fontSize:48,marginBottom:12}}>✏️</div>
+          <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert to vector art</div>
+          <div style={{fontSize:12,marginTop:4}}>Choose a color count above and select an image</div>
+        </div>}
+      </div>
+    </div>);
+  }
+
   // ═══ TEXT PAGE ═══
-  if(nbView==="page"&&nbData.pages[nbPageIdx]&&nbData.pages[nbPageIdx].type!=="pixel"){
+  if(nbView==="page"&&nbData.pages[nbPageIdx]&&nbData.pages[nbPageIdx].type!=="pixel"&&nbData.pages[nbPageIdx].type!=="vector"){
     const page=nbData.pages[nbPageIdx];const existingDraw=getDrawData();
     const hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
     return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -7015,7 +7203,7 @@ const NotebookPanel=()=>{
     <div style={{background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
       <input value={nbNewTitle} onChange={e=>setNbNewTitle(e.target.value)} placeholder="Page title" style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none",marginBottom:6}}/>
       <div style={{display:"flex",gap:4,marginBottom:6}}>
-        {[{id:"lined",label:"📝 Regular Note"},{id:"pixel",label:"🟨 Pixel Art"}].map(t=>(
+        {[{id:"lined",label:"📝 Note"},{id:"pixel",label:"🟨 Pixel Art"},{id:"vector",label:"✏️ Vector Art"}].map(t=>(
           <button key={t.id} onClick={()=>setNbNewType(t.id)}
             style={{flex:1,padding:"7px 2px",borderRadius:8,border:nbNewType===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.08)",
               background:nbNewType===t.id?"rgba(102,126,234,.15)":"rgba(255,255,255,.03)",color:nbNewType===t.id?"#a8b4f0":"#888",fontSize:12,fontWeight:700,cursor:"pointer"}}>{t.label}</button>))}
@@ -7058,7 +7246,7 @@ const NotebookPanel=()=>{
           <span style={{fontSize:13,fontWeight:800,color:"rgba(102,126,234,.6)",minWidth:28}}>{i+1}.</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title||"Untitled"}</div>
-            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
+            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):p.type==="vector"?"✏️ Vector Art":`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
           {nbPreviewMode&&<span style={{fontSize:14,opacity:.3,transition:"transform .2s",transform:isExpanded?"rotate(90deg)":"none"}}>▶</span>}
         </div>
         {isExpanded&&<div onClick={openPage} style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",cursor:"pointer"}}>
