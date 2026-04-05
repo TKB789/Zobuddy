@@ -6901,22 +6901,24 @@ const NotebookPanel=()=>{
   }
 
   // ═══ VECTOR ART ENGINE ═══
+  // ═══ VECTOR ART ENGINE — paint-by-number posterizer ═══
   const traceImageToSvg=(imgSrc,colorCount,callback)=>{
     const img=new Image();
     img.onerror=()=>{alert("Failed to load image");callback(null);};
     img.onload=()=>{
       try{
-      const maxDim=500;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+      // Work at 2x for quality, display at 1x
+      const maxDim=800;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
       const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      // Step 1: Blur to smooth out noise
       const tc=document.createElement("canvas");tc.width=w;tc.height=h;
       const tctx=tc.getContext("2d");
-      // Step 1: Slight blur to reduce noise/texture before quantizing
-      tctx.filter="blur(1.5px)";tctx.drawImage(img,0,0,w,h);tctx.filter="none";
+      tctx.filter="blur(2px)";tctx.drawImage(img,0,0,w,h);tctx.filter="none";
       const data=tctx.getImageData(0,0,w,h).data;
       const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
       const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
       const nearFull=(r,g,b)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
-      // Step 2: Quantize to DMC
+      // Step 2: Quantize
       const grid=new Uint16Array(w*h);const votes=new Map();
       for(let y=0;y<h;y++)for(let x=0;x<w;x++){
         const idx=(y*w+x)*4;if(data[idx+3]<30){grid[y*w+x]=65535;continue;}
@@ -6932,14 +6934,13 @@ const NotebookPanel=()=>{
         remap[i]=bi;
       }
       for(let i=0;i<grid.length;i++){if(grid[i]!==65535)grid[i]=remap[grid[i]];}
-      // Step 3: Mode filter — replace each pixel with the most common color in its 3x3 neighborhood
-      // This cleans up isolated pixels and makes regions more uniform
+      // Step 3: Mode filter (5 passes for very clean regions)
       const clean=new Uint16Array(w*h);
-      for(let pass=0;pass<3;pass++){
+      for(let pass=0;pass<5;pass++){
         const src=pass===0?grid:clean;
         for(let y=0;y<h;y++)for(let x=0;x<w;x++){
           const counts=new Map();
-          for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+          for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
             const ny=y+dy,nx=x+dx;
             if(ny>=0&&ny<h&&nx>=0&&nx<w){const v=src[ny*w+nx];if(v!==65535)counts.set(v,(counts.get(v)||0)+1);}
           }
@@ -6947,52 +6948,41 @@ const NotebookPanel=()=>{
           counts.forEach((c,v)=>{if(c>bestC){bestC=c;best=v;}});
           clean[y*w+x]=best;
         }
-        if(pass<2)for(let i=0;i<w*h;i++)grid[i]=clean[i];
+        if(pass<4)for(let i=0;i<w*h;i++)grid[i]=clean[i];
       }
-      // Step 4: Render as SVG — draw flat colored regions back-to-front
-      // Use canvas-based rendering for clean output (no jagged path tracing)
-      const svgCanvas=document.createElement("canvas");svgCanvas.width=w;svgCanvas.height=h;
-      const sctx=svgCanvas.getContext("2d");
+      // Step 4: Render to canvas as a clean image
+      const outCanvas=document.createElement("canvas");outCanvas.width=w;outCanvas.height=h;
+      const octx=outCanvas.getContext("2d");
+      const imgData=octx.createImageData(w,h);
+      for(let i=0;i<w*h;i++){
+        const ci=clean[i];
+        if(ci===65535||ci>=fullRgb.length){imgData.data[i*4+3]=0;continue;}
+        const[r,g,b]=fullRgb[ci];
+        imgData.data[i*4]=r;imgData.data[i*4+1]=g;imgData.data[i*4+2]=b;imgData.data[i*4+3]=255;
+      }
+      octx.putImageData(imgData,0,0);
+      const pngUrl=outCanvas.toDataURL("image/png");
+      // Build simple SVG as well (for SVG export) using larger rects
+      let svgPaths="";
       const usedColors=[...new Set(Array.from(clean).filter(v=>v!==65535))];
-      usedColors.sort((a,b)=>(votes.get(b)||0)-(votes.get(a)||0));
-      // Paint each color layer
+      usedColors.sort((a,b)=>{const va=votes.get(a)||0,vb=votes.get(b)||0;return vb-va;});
+      const gridCopy=new Uint16Array(clean);
       usedColors.forEach(ci=>{
-        sctx.fillStyle=fullPal[ci];
-        for(let y=0;y<h;y++){
-          let x=0;
+        for(let y=0;y<h;y++){let x=0;
           while(x<w){
-            if(clean[y*w+x]===ci){
-              let xe=x+1;while(xe<w&&clean[y*w+xe]===ci)xe++;
-              sctx.fillRect(x,y,xe-x,1);
+            if(gridCopy[y*w+x]===ci){
+              let xe=x+1;while(xe<w&&gridCopy[y*w+xe]===ci)xe++;
+              let ye=y+1;
+              outer:while(ye<h){for(let xx=x;xx<xe;xx++){if(gridCopy[ye*w+xx]!==ci)break outer;}ye++;}
+              for(let yy=y;yy<ye;yy++)for(let xx=x;xx<xe;xx++)gridCopy[yy*w+xx]=65534;
+              svgPaths+=`<rect x="${x}" y="${y}" width="${xe-x}" height="${ye-y}" fill="${fullPal[ci]}"/>`;
               x=xe;
             }else x++;
           }
         }
       });
-      // Convert to data URL and build a simple SVG with embedded image for clean display
-      const pngUrl=svgCanvas.toDataURL("image/png");
-      // Also build a proper layered SVG with path data for each color region
-      let paths="";
-      usedColors.forEach(ci=>{
-        // Build horizontal run-length spans merged into rectangles
-        const rects=[];
-        for(let y=0;y<h;y++){
-          let x=0;
-          while(x<w){
-            if(clean[y*w+x]===ci){let xe=x+1;while(xe<w&&clean[y*w+xe]===ci)xe++;rects.push({x,y,w:xe-x,h:1});x=xe;}else x++;
-          }
-        }
-        // Merge vertically adjacent identical-width rects
-        const merged=[];
-        rects.forEach(r=>{
-          const last=merged[merged.length-1];
-          if(last&&last.x===r.x&&last.w===r.w&&last.y+last.h===r.y){last.h++;}
-          else merged.push({...r});
-        });
-        merged.forEach(r=>{paths+=`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${fullPal[ci]}"/>`;});
-      });
-      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w*2}" height="${h*2}">${paths}</svg>`;
-      // Recount after cleaning
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${svgPaths}</svg>`;
+      // Color info
       const finalVotes=new Map();
       for(let i=0;i<clean.length;i++){const v=clean[i];if(v!==65535)finalVotes.set(v,(finalVotes.get(v)||0)+1);}
       const colorInfo=[...finalVotes.entries()].sort((a,b)=>b[1]-a[1]).map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
@@ -7107,8 +7097,8 @@ const NotebookPanel=()=>{
       </div>}
       {/* Image display */}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:12}}>
-        {vecSvg?<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top center"}} dangerouslySetInnerHTML={{__html:vecSvg}}/>
-        :vecPng?<img src={vecPng} style={{transform:`scale(${pageZoom})`,transformOrigin:"top center",maxWidth:"100%",height:"auto",borderRadius:4}}/>
+        {vecPng?<img src={vecPng} style={{transform:`scale(${pageZoom})`,transformOrigin:"top center",maxWidth:"100%",height:"auto",imageRendering:"auto"}}/>
+        :vecSvg?<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top center"}} dangerouslySetInnerHTML={{__html:vecSvg}}/>
         :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
           <div style={{fontSize:48,marginBottom:12}}>✏️</div>
           <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert to vector art</div>
