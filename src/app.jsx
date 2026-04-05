@@ -5986,6 +5986,8 @@ const NotebookPanel=()=>{
   const[drawSize,setDrawSize]=useState(3);
   const[drawEraser,setDrawEraser]=useState(false);
   const[drawEraserSize,setDrawEraserSize]=useState(20);
+  const[showDrawPicker,setShowDrawPicker]=useState(false);
+  const[drawPaletteSearch,setDrawPaletteSearch]=useState("");
   const[pixelColor,setPixelColor]=useState("#f5576c");
   const[pixelEraser,setPixelEraser]=useState(false);
   const[saved,setSaved]=useState(false);
@@ -6078,21 +6080,91 @@ const NotebookPanel=()=>{
     ctx.clearRect(0,0,c.width,c.height);drawImgRef.current=null;drawUndoStack.current=[];drawRedoStack.current=[];
     const d=readNb();const src=d.pages?.[pageIdxRef.current]?.drawData||null;
     if(src){drawImgRef.current=src;const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=src;}};
-  const onDown=React.useCallback((e)=>{if(e.touches&&e.touches.length>1)return;e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
-    pushDrawUndo();
-    const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;const t=e.touches?e.touches[0]:e;
+  const drawPinchDist=React.useRef(null);
+  const drawPendingDown=React.useRef(null);
+  const drawStartPos=React.useRef(null);
+  const onDown=React.useCallback((e)=>{
+    if(e.touches&&e.touches.length>1){
+      // Two fingers — cancel any pending dot, switch to pinch
+      if(drawPendingDown.current){clearTimeout(drawPendingDown.current);drawPendingDown.current=null;}
+      isDrawingRef.current=false;
+      const t1=e.touches[0],t2=e.touches[1];
+      drawPinchDist.current=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
+      e.preventDefault();return;
+    }
+    const c=drawCanvasRef.current;if(!c)return;
+    const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;
+    const t=e.touches?e.touches[0]:e;
     const x=(t.clientX-r.left)*sx,y=(t.clientY-r.top)*sy;
-    if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
-    else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=colorRef.current;ctx.fillStyle=colorRef.current;ctx.lineWidth=sizeRef.current;}
-    ctx.lineCap="round";ctx.lineJoin="round";
-    // Draw a dot at tap point
-    ctx.beginPath();ctx.arc(x,y,eraserRef.current?eraserSizeRef.current/2:sizeRef.current/2,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.moveTo(x,y);
-    isDrawingRef.current=true;},[]);
-  const onMove=React.useCallback((e)=>{if(e.touches&&e.touches.length>1){isDrawingRef.current=false;return;}if(!isDrawingRef.current)return;e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
+    drawStartPos.current={x,y};
+    if(!e.touches){
+      // Mouse: draw immediately
+      e.preventDefault();
+      const ctx=c.getContext("2d");pushDrawUndo();
+      if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
+      else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=colorRef.current;ctx.fillStyle=colorRef.current;ctx.lineWidth=sizeRef.current;}
+      ctx.lineCap="round";ctx.lineJoin="round";
+      ctx.beginPath();ctx.arc(x,y,eraserRef.current?eraserSizeRef.current/2:sizeRef.current/2,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.moveTo(x,y);
+      isDrawingRef.current=true;
+    } else {
+      // Touch: delay to check for second finger
+      drawPendingDown.current=setTimeout(()=>{
+        drawPendingDown.current=null;
+        const ctx=c.getContext("2d");pushDrawUndo();
+        if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
+        else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=colorRef.current;ctx.fillStyle=colorRef.current;ctx.lineWidth=sizeRef.current;}
+        ctx.lineCap="round";ctx.lineJoin="round";
+        ctx.beginPath();ctx.arc(x,y,eraserRef.current?eraserSizeRef.current/2:sizeRef.current/2,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.moveTo(x,y);
+        isDrawingRef.current=true;
+      },80);
+    }
+  },[]);
+  const onMove=React.useCallback((e)=>{
+    if(e.touches&&e.touches.length>1){
+      // Pinch zoom
+      if(drawPendingDown.current){clearTimeout(drawPendingDown.current);drawPendingDown.current=null;}
+      isDrawingRef.current=false;
+      const t1=e.touches[0],t2=e.touches[1];
+      const dist=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
+      if(drawPinchDist.current!==null){
+        const scale=dist/drawPinchDist.current;
+        if(Math.abs(scale-1)>0.01)setPageZoom(z=>Math.max(0.3,Math.min(8,z*scale)));
+      }
+      drawPinchDist.current=dist;
+      e.preventDefault();return;
+    }
+    // Flush pending down on first move
+    if(drawPendingDown.current){
+      clearTimeout(drawPendingDown.current);drawPendingDown.current=null;
+      const c=drawCanvasRef.current;if(!c)return;
+      const ctx=c.getContext("2d");pushDrawUndo();
+      const sp=drawStartPos.current;
+      if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
+      else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=colorRef.current;ctx.fillStyle=colorRef.current;ctx.lineWidth=sizeRef.current;}
+      ctx.lineCap="round";ctx.lineJoin="round";
+      if(sp){ctx.beginPath();ctx.moveTo(sp.x,sp.y);}
+      isDrawingRef.current=true;
+    }
+    if(!isDrawingRef.current)return;e.preventDefault();const c=drawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");
     const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;const t=e.touches?e.touches[0]:e;
     ctx.lineTo((t.clientX-r.left)*sx,(t.clientY-r.top)*sy);ctx.stroke();},[]);
-  const onUp=React.useCallback(()=>{if(!isDrawingRef.current)return;isDrawingRef.current=false;
+  const onUp=React.useCallback((e)=>{
+    // Flush pending dot for single tap
+    if(drawPendingDown.current){
+      clearTimeout(drawPendingDown.current);drawPendingDown.current=null;
+      const c=drawCanvasRef.current;if(c){
+        const ctx=c.getContext("2d");pushDrawUndo();
+        const sp=drawStartPos.current;
+        if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
+        else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=colorRef.current;ctx.fillStyle=colorRef.current;ctx.lineWidth=sizeRef.current;}
+        ctx.lineCap="round";ctx.lineJoin="round";
+        if(sp){ctx.beginPath();ctx.arc(sp.x,sp.y,eraserRef.current?eraserSizeRef.current/2:sizeRef.current/2,0,Math.PI*2);ctx.fill();}
+      }
+    }
+    drawPinchDist.current=null;drawStartPos.current=null;
+    if(!isDrawingRef.current){saveCanvas();return;}isDrawingRef.current=false;
     const c=drawCanvasRef.current;if(c)c.getContext("2d").globalCompositeOperation="source-over";saveCanvas();},[]);
   const canvasCallbackRef=React.useCallback((node)=>{if(node){drawCanvasRef.current=node;
     node.addEventListener("touchstart",onDown,{passive:false});node.addEventListener("touchmove",onMove,{passive:false});
@@ -6826,20 +6898,35 @@ const NotebookPanel=()=>{
         <span style={{fontSize:11,opacity:.4}}>{Math.round(pageZoom*100)}%</span>
         <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 8px"})}>+</button>
         <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
+        <button onClick={()=>{const title=nbData.pages[nbPageIdx]?.title||"Note";const content=textRef.current||"";const drawSrc=getDrawData();const win=window.open("","_blank");if(win){win.document.write(`<html><head><title>${title}</title><style>@media print{body{margin:0}}body{font-family:'Nunito',sans-serif;padding:20px;max-width:700px;margin:0 auto}pre{white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:15px;line-height:1.6}</style></head><body><h2>${title}</h2><pre>${content.replace(/</g,"&lt;")}</pre>${drawSrc?`<img src="${drawSrc}" style="max-width:100%;margin-top:12px;border:1px solid #eee"/>`:""}<button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:12px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}}}
+          style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🖨</button>
         <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗃️</button>
         <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗑️</button>
       </div>}
       {pageDrawMode&&<div style={{display:"flex",flexDirection:"column",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:5}}>
-          <button onClick={()=>setDrawEraser(e=>!e)} style={btn(drawEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",boxShadow:"0 0 8px rgba(245,87,108,.3)"}:{color:"#ccc"})}>
-            <span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span></button>
-          {["#fff","#f5576c","#feca57","#43e97b","#60a5fa","#f093fb","#fb923c"].map(c=>(
-            <div key={c} onClick={()=>{setDrawColor(c);setDrawEraser(false);}} style={{width:24,height:24,borderRadius:6,background:c,border:drawColor===c&&!drawEraser?"2px solid #fff":"2px solid rgba(255,255,255,.1)",cursor:"pointer",opacity:drawEraser?.4:1,transition:"opacity .15s"}}/>))}
+        <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+          <button onClick={()=>setDrawEraser(e=>!e)} style={btn(drawEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",padding:"4px 8px"}:{color:"#ccc",padding:"4px 8px"})}>
+            {drawEraser?"🧹":"✏️"}</button>
+          <div style={{width:1,height:20,background:"rgba(255,255,255,.1)"}}/>
+          {[
+            {c:"#FFFFFF",l:"White"},{c:"#000000",l:"Black"},{c:"#8C8C8C",l:"Gray"},
+            {c:"#C72B3B",l:"Red"},{c:"#13477D",l:"Blue"},{c:"#FFE502",l:"Yellow"},
+            {c:"#056517",l:"Green"},{c:"#FF8313",l:"Orange"},{c:"#5C184E",l:"Purple"}
+          ].map(p=>(
+            <div key={p.c} onClick={()=>{setDrawColor(p.c);setDrawEraser(false);}} title={p.l} style={{width:24,height:24,borderRadius:5,background:p.c,border:drawColor===p.c&&!drawEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",opacity:drawEraser?.4:1}}/>))}
+          <button onClick={()=>{setShowDrawPicker(v=>!v);setDrawPaletteSearch("");}} style={btn({padding:"4px 8px",fontSize:11,color:showDrawPicker?"#feca57":"#888"})}>{showDrawPicker?"▼":"🎨"}</button>
           <div style={{flex:1}}/>
           <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 6px",fontSize:14})}>−</button>
           <span style={{fontSize:10,opacity:.4,minWidth:28,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
           <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 6px",fontSize:14})}>+</button>
         </div>
+        {/* Full DMC palette for drawing */}
+        {showDrawPicker&&<div style={{padding:"4px 0 4px"}}>
+          <input value={drawPaletteSearch} onChange={e=>setDrawPaletteSearch(e.target.value)} placeholder="Search DMC # or color name..." style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#e8e0f0",fontSize:11,outline:"none",marginBottom:4,boxSizing:"border-box"}}/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(12,1fr)",gap:2,maxHeight:150,overflowY:"auto",overflowX:"hidden"}}>
+            {(drawPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=drawPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>(<div key={p.n+p.c} onClick={()=>{setDrawColor(p.c);setDrawEraser(false);}} title={`DMC ${p.n} — ${p.nm}`} style={{aspectRatio:"1",borderRadius:3,background:p.c,border:drawColor===p.c&&!drawEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.12)",cursor:"pointer",minWidth:0}}/>))}
+          </div>
+        </div>}
         {drawEraser?<div style={{display:"flex",alignItems:"center",gap:4}}>
           {[6,10,16,20,28,36,48].map(s=>(<div key={s} onClick={()=>setDrawEraserSize(s)}
             style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,
@@ -6851,6 +6938,10 @@ const NotebookPanel=()=>{
               background:drawSize===s?"rgba(255,255,255,.12)":"transparent",border:drawSize===s?`1px solid ${drawColor}`:"1px solid transparent",cursor:"pointer"}}>
             <div style={{width:Math.max(s,2),height:Math.max(s,2),borderRadius:"50%",background:drawColor}}/></div>))}
         </div>}
+        <div style={{display:"flex",alignItems:"center",gap:4}}>
+          <button onClick={()=>{const c=drawCanvasRef.current;if(!c)return;const dataUrl=c.toDataURL("image/png");const win=window.open("","_blank");if(win){win.document.write(`<html><head><title>${nbData.pages[nbPageIdx]?.title||"Drawing"}</title><style>@media print{body{margin:0}img{width:100%;height:auto;}}</style></head><body style="margin:0;background:#fff;display:flex;flex-direction:column;align-items:center;padding:8px"><h3 style="margin:4px 0;font-family:sans-serif">${nbData.pages[nbPageIdx]?.title||"Drawing"}</h3><img src="${dataUrl}" style="max-width:100%;height:auto;border:1px solid #eee"/><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:12px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}}}
+            style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>
+        </div>
       </div>}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
         <div style={{transform:pageDrawMode?undefined:`scale(${pageZoom})`,transformOrigin:"top left",width:pageDrawMode?undefined:`${100/pageZoom}%`}}>
