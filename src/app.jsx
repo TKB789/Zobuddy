@@ -6901,32 +6901,22 @@ const NotebookPanel=()=>{
   }
 
   // ═══ VECTOR ART ENGINE ═══
-  // Douglas-Peucker path simplification
-  const dpSimplify=(pts,epsilon)=>{
-    if(pts.length<=2)return pts;
-    let maxD=0,maxI=0;
-    const a=pts[0],b=pts[pts.length-1];
-    const dx=b.x-a.x,dy=b.y-a.y,len=Math.sqrt(dx*dx+dy*dy);
-    for(let i=1;i<pts.length-1;i++){
-      const d=len>0?Math.abs(dy*pts[i].x-dx*pts[i].y+b.x*a.y-b.y*a.x)/len:Math.hypot(pts[i].x-a.x,pts[i].y-a.y);
-      if(d>maxD){maxD=d;maxI=i;}
-    }
-    if(maxD>epsilon){const l=dpSimplify(pts.slice(0,maxI+1),epsilon);const r=dpSimplify(pts.slice(maxI),epsilon);return l.slice(0,-1).concat(r);}
-    return[pts[0],pts[pts.length-1]];
-  };
   const traceImageToSvg=(imgSrc,colorCount,callback)=>{
     const img=new Image();
     img.onerror=()=>{alert("Failed to load image");callback(null);};
     img.onload=()=>{
       try{
-      const maxDim=600;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+      const maxDim=500;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
       const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
       const tc=document.createElement("canvas");tc.width=w;tc.height=h;
-      const tctx=tc.getContext("2d");tctx.drawImage(img,0,0,w,h);
+      const tctx=tc.getContext("2d");
+      // Step 1: Slight blur to reduce noise/texture before quantizing
+      tctx.filter="blur(1.5px)";tctx.drawImage(img,0,0,w,h);tctx.filter="none";
       const data=tctx.getImageData(0,0,w,h).data;
       const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
       const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
       const nearFull=(r,g,b)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
+      // Step 2: Quantize to DMC
       const grid=new Uint16Array(w*h);const votes=new Map();
       for(let y=0;y<h;y++)for(let x=0;x<w;x++){
         const idx=(y*w+x)*4;if(data[idx+3]<30){grid[y*w+x]=65535;continue;}
@@ -6942,62 +6932,71 @@ const NotebookPanel=()=>{
         remap[i]=bi;
       }
       for(let i=0;i<grid.length;i++){if(grid[i]!==65535)grid[i]=remap[grid[i]];}
-      const usedColors=[...new Set(Array.from(grid).filter(v=>v!==65535))];
+      // Step 3: Mode filter — replace each pixel with the most common color in its 3x3 neighborhood
+      // This cleans up isolated pixels and makes regions more uniform
+      const clean=new Uint16Array(w*h);
+      for(let pass=0;pass<3;pass++){
+        const src=pass===0?grid:clean;
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+          const counts=new Map();
+          for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+            const ny=y+dy,nx=x+dx;
+            if(ny>=0&&ny<h&&nx>=0&&nx<w){const v=src[ny*w+nx];if(v!==65535)counts.set(v,(counts.get(v)||0)+1);}
+          }
+          let best=src[y*w+x],bestC=0;
+          counts.forEach((c,v)=>{if(c>bestC){bestC=c;best=v;}});
+          clean[y*w+x]=best;
+        }
+        if(pass<2)for(let i=0;i<w*h;i++)grid[i]=clean[i];
+      }
+      // Step 4: Render as SVG — draw flat colored regions back-to-front
+      // Use canvas-based rendering for clean output (no jagged path tracing)
+      const svgCanvas=document.createElement("canvas");svgCanvas.width=w;svgCanvas.height=h;
+      const sctx=svgCanvas.getContext("2d");
+      const usedColors=[...new Set(Array.from(clean).filter(v=>v!==65535))];
       usedColors.sort((a,b)=>(votes.get(b)||0)-(votes.get(a)||0));
-      let paths="";
-      const eps=Math.max(0.8,Math.min(w,h)/200);
+      // Paint each color layer
       usedColors.forEach(ci=>{
-        const mw=w+2,mh=h+2;const mask=new Uint8Array(mw*mh);
-        for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(grid[y*w+x]===ci)mask[(y+1)*mw+(x+1)]=1;}
-        const visited=new Uint8Array(mw*mh);
-        const contours=[];
-        for(let y=1;y<mh-1;y++)for(let x=1;x<mw-1;x++){
-          if(mask[y*mw+x]===1&&mask[y*mw+(x-1)]===0&&!visited[y*mw+x]){
-            const pts=[];let cx=x,cy=y,bx=x-1,by=y;
-            let steps=0;const maxSteps=(mw+mh)*4;
-            const sx=cx,sy=cy;
-            do{
-              pts.push({x:cx-1,y:cy-1});
-              visited[cy*mw+cx]=1;
-              const ndx=[0,1,1,1,0,-1,-1,-1],ndy=[-1,-1,0,1,1,1,0,-1];
-              let startDir=0;
-              for(let d=0;d<8;d++){if(cx+ndx[d]===bx&&cy+ndy[d]===by){startDir=d;break;}}
-              let found=false;
-              for(let d=1;d<=8;d++){
-                const nd=(startDir+d)%8;
-                const nx=cx+ndx[nd],ny=cy+ndy[nd];
-                if(nx>=0&&nx<mw&&ny>=0&&ny<mh&&mask[ny*mw+nx]===1){
-                  bx=cx;by=cy;cx=nx;cy=ny;found=true;break;
-                }
-              }
-              if(!found)break;
-              steps++;
-            }while((cx!==sx||cy!==sy)&&steps<maxSteps);
-            if(pts.length>4)contours.push(pts);
+        sctx.fillStyle=fullPal[ci];
+        for(let y=0;y<h;y++){
+          let x=0;
+          while(x<w){
+            if(clean[y*w+x]===ci){
+              let xe=x+1;while(xe<w&&clean[y*w+xe]===ci)xe++;
+              sctx.fillRect(x,y,xe-x,1);
+              x=xe;
+            }else x++;
           }
         }
-        contours.forEach(rawPts=>{
-          const simplified=dpSimplify(rawPts,eps);
-          if(simplified.length<3)return;
-          const op=simplified;
-          let d=`M${op[0].x.toFixed(1)},${op[0].y.toFixed(1)}`;
-          for(let i=0;i<op.length;i++){
-            const p0=op[(i-1+op.length)%op.length];
-            const p1=op[i];
-            const p2=op[(i+1)%op.length];
-            const p3=op[(i+2)%op.length];
-            const t=0.4;
-            const cp1x=p1.x+(p2.x-p0.x)*t/2,cp1y=p1.y+(p2.y-p0.y)*t/2;
-            const cp2x=p2.x-(p3.x-p1.x)*t/2,cp2y=p2.y-(p3.y-p1.y)*t/2;
-            d+=`C${cp1x.toFixed(1)},${cp1y.toFixed(1)},${cp2x.toFixed(1)},${cp2y.toFixed(1)},${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-          }
-          d+="Z";
-          paths+=`<path d="${d}" fill="${fullPal[ci]}"/>`;
-        });
       });
-      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w*2}" height="${h*2}" preserveAspectRatio="none">${paths}</svg>`;
-      const colorInfo=topN.map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
-      callback({svg,width:w,height:h,colors:colorInfo});
+      // Convert to data URL and build a simple SVG with embedded image for clean display
+      const pngUrl=svgCanvas.toDataURL("image/png");
+      // Also build a proper layered SVG with path data for each color region
+      let paths="";
+      usedColors.forEach(ci=>{
+        // Build horizontal run-length spans merged into rectangles
+        const rects=[];
+        for(let y=0;y<h;y++){
+          let x=0;
+          while(x<w){
+            if(clean[y*w+x]===ci){let xe=x+1;while(xe<w&&clean[y*w+xe]===ci)xe++;rects.push({x,y,w:xe-x,h:1});x=xe;}else x++;
+          }
+        }
+        // Merge vertically adjacent identical-width rects
+        const merged=[];
+        rects.forEach(r=>{
+          const last=merged[merged.length-1];
+          if(last&&last.x===r.x&&last.w===r.w&&last.y+last.h===r.y){last.h++;}
+          else merged.push({...r});
+        });
+        merged.forEach(r=>{paths+=`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${fullPal[ci]}"/>`;});
+      });
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w*2}" height="${h*2}">${paths}</svg>`;
+      // Recount after cleaning
+      const finalVotes=new Map();
+      for(let i=0;i<clean.length;i++){const v=clean[i];if(v!==65535)finalVotes.set(v,(finalVotes.get(v)||0)+1);}
+      const colorInfo=[...finalVotes.entries()].sort((a,b)=>b[1]-a[1]).map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
+      callback({svg,width:w,height:h,colors:colorInfo,pngUrl});
       }catch(err){alert("Error: "+err.message);callback(null);}
     };img.src=imgSrc;
   };
@@ -7012,27 +7011,13 @@ const NotebookPanel=()=>{
           setVecImporting(false);
           if(!result)return;
           vecSvgRef.current=result.svg;
-          // Convert SVG to PNG data URL for compact localStorage storage
-          const svgBlob=new Blob([result.svg],{type:"image/svg+xml"});
-          const url=URL.createObjectURL(svgBlob);
-          const img2=new Image();
-          img2.onload=()=>{
-            const c2=document.createElement("canvas");c2.width=result.width*2;c2.height=result.height*2;
-            const ctx2=c2.getContext("2d");ctx2.fillStyle="#fff";ctx2.fillRect(0,0,c2.width,c2.height);
-            ctx2.drawImage(img2,0,0,c2.width,c2.height);
-            const pngUrl=c2.toDataURL("image/jpeg",0.85);
-            URL.revokeObjectURL(url);
-            const d=readNb();const pi=pageIdxRef.current;
-            if(d.pages?.[pi]){
-              d.pages[pi].vectorPng=pngUrl;
-              d.pages[pi].vectorColors=result.colors;
-              // Don't store full SVG in localStorage — too large
-              delete d.pages[pi].vectorSvg;
-              try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — image may be too large. Try fewer colors.");}
-            }
-          };
-          img2.onerror=()=>{URL.revokeObjectURL(url);alert("Failed to render SVG preview");};
-          img2.src=url;
+          const d=readNb();const pi=pageIdxRef.current;
+          if(d.pages?.[pi]){
+            d.pages[pi].vectorPng=result.pngUrl||"";
+            d.pages[pi].vectorColors=result.colors;
+            delete d.pages[pi].vectorSvg;
+            try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — image may be too large. Try fewer colors.");}
+          }
         });
       };reader.readAsDataURL(file);
     };
