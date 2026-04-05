@@ -6665,22 +6665,44 @@ const NotebookPanel=()=>{
 
   // ─── STYLES ─────────────────────────────────────────────────────
   const hs=20,hcol=hs*1.5,hrow=Math.round(hs*Math.sqrt(3)),hoff=Math.round(hrow/2);
-  const PageBg=({type,children})=>(
-    <div style={{position:"relative",background:"rgba(255,255,255,.02)",borderRadius:8,border:"1px solid rgba(255,255,255,.06)",minWidth:500,minHeight:800}}>
+  const NOTE_BG_COLORS=[
+    {c:"",l:"Default",preview:"rgba(255,255,255,.02)"},
+    {c:"#1a1a2e",l:"Dark Navy"},
+    {c:"#2d1b2e",l:"Dark Purple"},
+    {c:"#1b2e1b",l:"Dark Green"},
+    {c:"#2e2b1b",l:"Dark Gold"},
+    {c:"#2e1b1b",l:"Dark Red"},
+    {c:"#f5f0e0",l:"Cream"},
+    {c:"#ffffff",l:"White"},
+    {c:"#e8f0e8",l:"Mint"},
+    {c:"#f0e8f0",l:"Lavender"},
+    {c:"#fff8e1",l:"Butter"},
+    {c:"#e3f2fd",l:"Ice Blue"},
+  ];
+  const getPageBg=(page)=>page?.bgColor||"";
+  const isLightBg=(bg)=>{if(!bg)return false;const h=bg.replace("#","");if(h.length!==6)return false;const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return(r*.299+g*.587+b*.114)>150;};
+  const PageBg=({type,bgColor,children})=>{
+    const bg=bgColor||"rgba(255,255,255,.02)";
+    const light=isLightBg(bgColor);
+    const lineColor=light?"rgba(0,0,0,.08)":"rgba(255,255,255,.06)";
+    const dotColor=light?"rgba(0,0,0,.12)":"rgba(255,255,255,.08)";
+    return(
+    <div style={{position:"relative",background:bg,borderRadius:8,border:"1px solid "+(light?"rgba(0,0,0,.1)":"rgba(255,255,255,.06)"),minWidth:500,minHeight:800}}>
       {type==="lined"&&<svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
-        {Array.from({length:50},(_,i)=><line key={i} x1="0" y1={28+i*28} x2="100%" y2={28+i*28} stroke="rgba(255,255,255,.06)" strokeWidth="1"/>)}</svg>}
+        {Array.from({length:50},(_,i)=><line key={i} x1="0" y1={28+i*28} x2="100%" y2={28+i*28} stroke={lineColor} strokeWidth="1"/>)}</svg>}
       {type==="square"&&<svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
-        <defs><pattern id="sq8" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="0" cy="0" r="1" fill="rgba(255,255,255,.08)"/><circle cx="24" cy="0" r="1" fill="rgba(255,255,255,.08)"/><circle cx="0" cy="24" r="1" fill="rgba(255,255,255,.08)"/><circle cx="24" cy="24" r="1" fill="rgba(255,255,255,.08)"/></pattern></defs>
+        <defs><pattern id="sq8" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="0" cy="0" r="1" fill={dotColor}/><circle cx="24" cy="0" r="1" fill={dotColor}/><circle cx="0" cy="24" r="1" fill={dotColor}/><circle cx="24" cy="24" r="1" fill={dotColor}/></pattern></defs>
         <rect width="100%" height="100%" fill="url(#sq8)"/></svg>}
       {type==="hex"&&<svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
         <defs><pattern id="hx8" width={hcol*2} height={hrow} patternUnits="userSpaceOnUse">
-          <circle cx="0" cy="0" r="1.2" fill="rgba(255,255,255,.08)"/><circle cx={hcol} cy="0" r="1.2" fill="rgba(255,255,255,.08)"/>
-          <circle cx={hcol*2} cy="0" r="1.2" fill="rgba(255,255,255,.08)"/><circle cx={hcol*0.5} cy={hoff} r="1.2" fill="rgba(255,255,255,.08)"/>
-          <circle cx={hcol*1.5} cy={hoff} r="1.2" fill="rgba(255,255,255,.08)"/></pattern></defs>
+          <circle cx="0" cy="0" r="1.2" fill={dotColor}/><circle cx={hcol} cy="0" r="1.2" fill={dotColor}/>
+          <circle cx={hcol*2} cy="0" r="1.2" fill={dotColor}/><circle cx={hcol*0.5} cy={hoff} r="1.2" fill={dotColor}/>
+          <circle cx={hcol*1.5} cy={hoff} r="1.2" fill={dotColor}/></pattern></defs>
         <rect width="100%" height="100%" fill="url(#hx8)"/></svg>}
       {children}</div>);
-  const ts=(type)=>({width:"100%",minHeight:800,padding:type==="lined"?"6px 14px":type==="square"?"2px 14px":type==="hex"?"13px 14px":"14px",
-    background:"transparent",border:"none",color:"#e8e0f0",fontSize:15,
+  };
+  const ts=(type,bgColor)=>({width:"100%",minHeight:800,padding:type==="lined"?"6px 14px":type==="square"?"2px 14px":type==="hex"?"13px 14px":"14px",
+    background:"transparent",border:"none",color:isLightBg(bgColor)?"#1a1a2e":"#e8e0f0",fontSize:15,
     lineHeight:type==="lined"?"28px":type==="square"?"24px":type==="hex"?"35px":"1.6",
     outline:"none",resize:"none",fontFamily:"'Nunito',sans-serif"});
   const btn=(extra)=>({background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"6px 12px",fontSize:13,color:"#ccc",cursor:"pointer",fontWeight:700,...extra});
@@ -6893,12 +6915,16 @@ const NotebookPanel=()=>{
       {!pageDrawMode&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0,flexWrap:"wrap"}}>
         {[{id:"lined",l:"📝"},{id:"blank",l:"📄"},{id:"square",l:"🔲"},{id:"hex",l:"⬡"}].map(t=>(
           <button key={t.id} onClick={()=>switchPageType(t.id)} style={{padding:"3px 6px",borderRadius:6,fontSize:12,border:page.type===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:page.type===t.id?"rgba(102,126,234,.15)":"transparent",color:page.type===t.id?"#a8b4f0":"#666",cursor:"pointer"}}>{t.l}</button>))}
+        <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
+        {NOTE_BG_COLORS.map(bg=>(
+          <div key={bg.c||"default"} onClick={()=>{save("bgColor",bg.c);syncState();}} title={bg.l}
+            style={{width:18,height:18,borderRadius:4,background:bg.c||"rgba(255,255,255,.02)",border:(page.bgColor||"")===(bg.c)?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",boxSizing:"border-box"}}/>))}
         <div style={{flex:1}}/>
         <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 8px"})}>−</button>
         <span style={{fontSize:11,opacity:.4}}>{Math.round(pageZoom*100)}%</span>
         <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 8px"})}>+</button>
         <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
-        <button onClick={()=>{const title=nbData.pages[nbPageIdx]?.title||"Note";const content=textRef.current||"";const drawSrc=getDrawData();const win=window.open("","_blank");if(win){win.document.write(`<html><head><title>${title}</title><style>@media print{body{margin:0;padding:0}.page{page-break-inside:avoid}}body{font-family:'Nunito',sans-serif;padding:20px;max-width:700px;margin:0 auto}</style></head><body><h2 style="margin:0 0 12px">${title}</h2><div class="page" style="position:relative;border:1px solid #eee;border-radius:8px;overflow:hidden;min-height:400px"><pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:15px;line-height:1.6;padding:16px;margin:0">${content.replace(/</g,"&lt;")}</pre>${drawSrc?`<img src="${drawSrc}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none"/>`:""}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:12px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}}}
+        <button onClick={()=>{const title=nbData.pages[nbPageIdx]?.title||"Note";const content=textRef.current||"";const drawSrc=getDrawData();const bg=page.bgColor||"#fff";const light=isLightBg(page.bgColor);const textColor=light?"#1a1a2e":"#333";const win=window.open("","_blank");if(win){win.document.write(`<html><head><title>${title}</title><style>@media print{body{margin:0;padding:0}.page{page-break-inside:avoid}}body{font-family:'Nunito',sans-serif;padding:20px;max-width:700px;margin:0 auto}</style></head><body><h2 style="margin:0 0 12px">${title}</h2><div class="page" style="position:relative;border:1px solid #ddd;border-radius:8px;overflow:hidden;min-height:400px;background:${bg}"><pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:15px;line-height:1.6;padding:16px;margin:0;color:${textColor}">${content.replace(/</g,"&lt;")}</pre>${drawSrc?`<img src="${drawSrc}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none"/>`:""}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:12px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}}}
           style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🖨</button>
         <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗃️</button>
         <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗑️</button>
@@ -6945,7 +6971,7 @@ const NotebookPanel=()=>{
       </div>}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
         <div style={{transform:pageDrawMode?undefined:`scale(${pageZoom})`,transformOrigin:"top left",width:pageDrawMode?undefined:`${100/pageZoom}%`}}>
-          <PageBg type={page.type}>
+          <PageBg type={page.type} bgColor={page.bgColor}>
             {!pageDrawMode&&<div style={{position:"relative"}}>
               {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",height:800,pointerEvents:"none",opacity:.7,zIndex:2}}/>}
               <textarea ref={(el)=>{if(el){
@@ -6955,10 +6981,10 @@ const NotebookPanel=()=>{
                   textRef.current=content;el.value=content;el.dataset.loadedIdx=curIdx;
                 }
                 textareaRef.current=el;}}
-              } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type),position:"relative",zIndex:1}}/>
+              } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type,page.bgColor),position:"relative",zIndex:1}}/>
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}}>
-              {(()=>{const baseTs=ts(page.type);const scaledPadding=(()=>{
+              {(()=>{const baseTs=ts(page.type,page.bgColor);const scaledPadding=(()=>{
                 const p=baseTs.padding;if(typeof p==="number")return `${p*pageZoom}px`;
                 const parts=p.split(" ").map(v=>parseFloat(v)*pageZoom+"px");return parts.join(" ");
               })();return <div style={{position:"absolute",top:0,left:0,width:500*pageZoom,minHeight:800*pageZoom,
