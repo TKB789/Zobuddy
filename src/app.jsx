@@ -6907,30 +6907,36 @@ const NotebookPanel=()=>{
           :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
           <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
-        {!pageDrawMode&&page.type!=="pixel"&&<button onClick={handleCheckbox} style={btn({color:"#aaa",padding:"6px 8px"})}>☑</button>}
-        <button onClick={()=>{saveAll();if(!pageDrawMode){setPageZoom(1);}setPageDrawMode(m=>!m);}} style={btn(pageDrawMode?{background:"rgba(240,147,251,.2)",border:"1px solid rgba(240,147,251,.4)",color:"#f093fb"}:{color:"#aaa"})}>{pageDrawMode?"🔡":"🎨"}</button>
         <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>
       </div>
-      {/* Second row: page type, zoom, archive/delete */}
-      {!pageDrawMode&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 6px",flexShrink:0,flexWrap:"wrap"}}>
-        {[{id:"lined",l:"📝"},{id:"blank",l:"📄"},{id:"square",l:"🔲"},{id:"hex",l:"⬡"}].map(t=>(
-          <button key={t.id} onClick={()=>switchPageType(t.id)} style={{padding:"3px 6px",borderRadius:6,fontSize:12,border:page.type===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:page.type===t.id?"rgba(102,126,234,.15)":"transparent",color:page.type===t.id?"#a8b4f0":"#666",cursor:"pointer"}}>{t.l}</button>))}
+      {/* Row 2: draw toggle + bg colors + Style selection */}
+      {!pageDrawMode&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
+        <button onClick={()=>{saveAll();setPageZoom(1);setPageDrawMode(true);}} style={btn({color:"#aaa",padding:"4px 8px"})}>🎨</button>
         <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
         {NOTE_BG_COLORS.map(bg=>(
           <div key={bg.c||"default"} onClick={()=>{save("bgColor",bg.c);syncState();}} title={bg.l}
-            style={{width:18,height:18,borderRadius:4,background:bg.c||"rgba(255,255,255,.02)",border:(page.bgColor||"")===(bg.c)?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",boxSizing:"border-box"}}/>))}
+            style={{width:16,height:16,borderRadius:3,background:bg.c||"rgba(255,255,255,.02)",border:(page.bgColor||"")===(bg.c)?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",boxSizing:"border-box"}}/>))}
         <div style={{flex:1}}/>
-        <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"4px 8px"})}>−</button>
-        <span style={{fontSize:11,opacity:.4}}>{Math.round(pageZoom*100)}%</span>
-        <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"4px 8px"})}>+</button>
+        <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Style:</span>
+        {[{id:"blank",l:"Blank"},{id:"lined",l:"Lined"},{id:"square",l:"Grid"},{id:"hex",l:"Hex"}].map(t=>(
+          <button key={t.id} onClick={()=>switchPageType(t.id)} style={{padding:"2px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:page.type===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:page.type===t.id?"rgba(102,126,234,.15)":"transparent",color:page.type===t.id?"#a8b4f0":"#666",cursor:"pointer"}}>{t.l}</button>))}
+      </div>}
+      {/* Row 3: checkbox + zoom + print + archive + delete */}
+      {!pageDrawMode&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
+        <button onClick={handleCheckbox} style={btn({color:"#aaa",padding:"4px 8px",fontSize:11})}>☑</button>
+        <div style={{flex:1}}/>
+        <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"3px 7px",fontSize:11})}>−</button>
+        <span style={{fontSize:10,opacity:.4,minWidth:28,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
+        <button onClick={()=>setPageZoom(z=>Math.min(4,z+0.2))} style={btn({padding:"3px 7px",fontSize:11})}>+</button>
         <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
         <button onClick={()=>{const title=nbData.pages[nbPageIdx]?.title||"Note";const content=textRef.current||"";const drawSrc=getDrawData();const bg=page.bgColor||"#fff";const light=isLightBg(page.bgColor);const textColor=light?"#1a1a2e":"#333";const win=window.open("","_blank");if(win){win.document.write(`<html><head><title>${title}</title><style>@media print{body{margin:0;padding:0}.page{page-break-inside:avoid}}body{font-family:'Nunito',sans-serif;padding:20px;max-width:700px;margin:0 auto}</style></head><body><h2 style="margin:0 0 12px">${title}</h2><div class="page" style="position:relative;border:1px solid #ddd;border-radius:8px;overflow:hidden;min-height:400px;background:${bg}"><pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:15px;line-height:1.6;padding:16px;margin:0;color:${textColor}">${content.replace(/</g,"&lt;")}</pre>${drawSrc?`<img src="${drawSrc}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none"/>`:""}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:12px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}}}
-          style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🖨</button>
-        <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗃️</button>
-        <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"4px 6px",fontSize:11})}>🗑️</button>
+          style={btn({color:"#888",padding:"3px 7px",fontSize:11})}>🖨</button>
+        <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:11})}>🗃️</button>
+        <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:11})}>🗑️</button>
       </div>}
       {pageDrawMode&&<div style={{display:"flex",flexDirection:"column",gap:4,padding:"2px 10px 6px",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+          <button onClick={()=>{saveAll();setPageDrawMode(false);}} style={btn({background:"rgba(102,126,234,.15)",border:"1px solid rgba(102,126,234,.3)",color:"#a8b4f0",padding:"4px 8px"})}>🔡</button>
           <button onClick={()=>setDrawEraser(e=>!e)} style={btn(drawEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",padding:"4px 8px"}:{color:"#ccc",padding:"4px 8px"})}>
             {drawEraser?"🧹":"✏️"}</button>
           <div style={{width:1,height:20,background:"rgba(255,255,255,.1)"}}/>
@@ -7012,10 +7018,10 @@ const NotebookPanel=()=>{
     <div style={{background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
       <input value={nbNewTitle} onChange={e=>setNbNewTitle(e.target.value)} placeholder="Page title" style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none",marginBottom:6}}/>
       <div style={{display:"flex",gap:4,marginBottom:6}}>
-        {[{id:"lined",label:"📝 Lined"},{id:"blank",label:"📄 Blank"},{id:"square",label:"🔲 Grid"},{id:"hex",label:"⬡ Hex"},{id:"pixel",label:"🟨 Pixel"}].map(t=>(
+        {[{id:"lined",label:"📝 Regular Note"},{id:"pixel",label:"🟨 Pixel Art"}].map(t=>(
           <button key={t.id} onClick={()=>setNbNewType(t.id)}
             style={{flex:1,padding:"7px 2px",borderRadius:8,border:nbNewType===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.08)",
-              background:nbNewType===t.id?"rgba(102,126,234,.15)":"rgba(255,255,255,.03)",color:nbNewType===t.id?"#a8b4f0":"#888",fontSize:11,fontWeight:700,cursor:"pointer"}}>{t.label}</button>))}
+              background:nbNewType===t.id?"rgba(102,126,234,.15)":"rgba(255,255,255,.03)",color:nbNewType===t.id?"#a8b4f0":"#888",fontSize:12,fontWeight:700,cursor:"pointer"}}>{t.label}</button>))}
       </div>
       {nbNewType==="pixel"&&<div style={{marginBottom:6}}>
         <div style={{fontSize:11,opacity:.4,marginBottom:4}}>Grid size:</div>
@@ -9501,7 +9507,7 @@ function SpiritAnimals(){
   const TabBar=(
     <div style={{flexShrink:0,margin:"0 4px"}}>
       <div style={{display:"flex",alignItems:"stretch",background:"#07071a",borderRadius:"14px 14px 0 0",border:`1px solid ${tabBorderColor}`,borderBottom:"none",overflow:"hidden"}}>
-        {[{id:"buddy",icon:"🐾",label:"Buddy"},{id:"planner",icon:"📅",label:"Planner"},{id:"budget",icon:"💰",label:"Budget"},{id:"learn",icon:"🎓",label:"Learn"},{id:"notebook",icon:"📓",label:"Notes"}].map((tab,i)=>{
+        {[{id:"buddy",icon:"🐾",label:"Buddy"},{id:"planner",icon:"📅",label:"Planner"},{id:"budget",icon:"💰",label:"Budget"},{id:"learn",icon:"🎓",label:"Learn"},{id:"notebook",icon:"📓",label:"Notepad"}].map((tab,i)=>{
           const active=activeTab===tab.id;
           return(
             <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
