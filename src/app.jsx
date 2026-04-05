@@ -5997,24 +5997,30 @@ const NotebookPanel=()=>{
   const doRename=()=>{if(!renameVal.trim())return;save("title",renameVal.trim());setRenaming(false);syncState();};
   const switchPageType=(newType)=>{save("type",newType);syncState();};
 
-  // ─── INLINE CHECKBOX — single tap: toggle if on checkbox line, else insert ☐
+  // ─── INLINE CHECKBOX — single tap: toggle if on checkbox line, else insert ⬜
   const handleCheckbox=()=>{
     const el=textareaRef.current;if(!el)return;
     const pos=el.selectionStart;const val=el.value;
     const lineStart=val.lastIndexOf("\n",pos-1)+1;
     const lineEnd=val.indexOf("\n",pos);const le=lineEnd===-1?val.length:lineEnd;
     const line=val.slice(lineStart,le);
-    const unchecked=line.indexOf("☐");const checked=line.indexOf("☑");
-    if(unchecked>=0||checked>=0){
-      // Toggle existing checkbox on this line
-      let idx,wasDone;
-      if(unchecked>=0&&(checked<0||unchecked<checked)){idx=lineStart+unchecked;wasDone=false;}
-      else{idx=lineStart+checked;wasDone=true;}
-      const newVal=val.slice(0,idx)+(wasDone?"☐":"☑")+val.slice(idx+1);
-      el.value=newVal;textRef.current=newVal;el.selectionStart=el.selectionEnd=pos;saveText();
+    // Support both old (☐☑) and new (⬜✅) checkbox formats
+    const findCheck=(str,chars)=>{for(const ch of chars){const i=str.indexOf(ch);if(i>=0)return{i,ch};}return null;};
+    const uncheckedMatch=findCheck(line,["⬜","☐"]);
+    const checkedMatch=findCheck(line,["✅","☑"]);
+    if(uncheckedMatch||checkedMatch){
+      let idx,wasDone,charLen;
+      if(uncheckedMatch&&(!checkedMatch||uncheckedMatch.i<checkedMatch.i)){
+        idx=lineStart+uncheckedMatch.i;wasDone=false;charLen=uncheckedMatch.ch.length;
+      }else{
+        idx=lineStart+checkedMatch.i;wasDone=true;charLen=checkedMatch.ch.length;
+      }
+      const replacement=wasDone?"⬜":"✅";
+      const newVal=val.slice(0,idx)+replacement+val.slice(idx+charLen);
+      el.value=newVal;textRef.current=newVal;el.selectionStart=el.selectionEnd=pos+(replacement.length-charLen);saveText();
     }else{
       // No checkbox on line — insert one at cursor
-      const newVal=val.slice(0,pos)+"☐ "+val.slice(pos);
+      const newVal=val.slice(0,pos)+"⬜ "+val.slice(pos);
       el.value=newVal;textRef.current=newVal;el.selectionStart=el.selectionEnd=pos+2;el.focus();saveText();
     }
   };
