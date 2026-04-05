@@ -7055,7 +7055,7 @@ const NotebookPanel=()=>{
             <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
           {nbPreviewMode&&<span style={{fontSize:14,opacity:.3,transition:"transform .2s",transform:isExpanded?"rotate(90deg)":"none"}}>▶</span>}
         </div>
-        {isExpanded&&<div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+        {isExpanded&&<div onClick={openPage} style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",cursor:"pointer"}}>
           {/* Preview — combined text + drawing overlay, matching actual note layout */}
           {p.type!=="pixel"&&(p.content||p.drawData)?<div style={{position:"relative",marginBottom:8,borderRadius:6,border:"1px solid rgba(255,255,255,.06)",background:"rgba(255,255,255,.02)",overflow:"hidden",aspectRatio:"500/300"}}>
             {/* Text layer */}
@@ -7074,15 +7074,14 @@ const NotebookPanel=()=>{
               }} width={dims.c*ps} height={dims.r*ps} style={{width:Math.min(200,dims.c*ps),height:"auto",borderRadius:4,border:"1px solid rgba(255,255,255,.06)",imageRendering:"pixelated"}}/>;
             })()}</div>}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
-          <button onClick={openPage}
-            style={{padding:"6px 16px",borderRadius:8,background:"rgba(102,126,234,.12)",border:"1px solid rgba(102,126,234,.25)",color:"#a8b4f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Open</button>
           <div style={{display:"flex",gap:2}}>
             <button onClick={(e)=>{e.stopPropagation();movePageInToc(i,-1);}} disabled={i===0} style={{padding:"4px 8px",borderRadius:6,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.08)",color:i===0?"rgba(255,255,255,.15)":"#aaa",fontSize:12,cursor:i===0?"default":"pointer",fontWeight:700}}>▲</button>
             <button onClick={(e)=>{e.stopPropagation();movePageInToc(i,1);}} disabled={i===nbData.pages.length-1} style={{padding:"4px 8px",borderRadius:6,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.08)",color:i===nbData.pages.length-1?"rgba(255,255,255,.15)":"#aaa",fontSize:12,cursor:i===nbData.pages.length-1?"default":"pointer",fontWeight:700}}>▼</button>
           </div>
-          <button onClick={()=>{const d=readNb();d.archive.push(d.pages[i]);d.pages.splice(i,1);saveNb(d);setNbExpandedIdx(null);}}
+          <div style={{flex:1}}/>
+          <button onClick={(e)=>{e.stopPropagation();const d=readNb();d.archive.push(d.pages[i]);d.pages.splice(i,1);saveNb(d);setNbExpandedIdx(null);}}
             style={{padding:"6px 12px",borderRadius:8,background:"rgba(254,202,87,.08)",border:"1px solid rgba(254,202,87,.15)",color:"#feca57",fontSize:12,fontWeight:700,cursor:"pointer"}}>🗃️</button>
-          <button onClick={()=>{if(!confirm(`Delete "${p.title}"?`))return;const d=readNb();d.pages.splice(i,1);saveNb(d);setNbExpandedIdx(null);}}
+          <button onClick={(e)=>{e.stopPropagation();if(!confirm(`Delete "${p.title}"?`))return;const d=readNb();d.pages.splice(i,1);saveNb(d);setNbExpandedIdx(null);}}
             style={{padding:"6px 12px",borderRadius:8,background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.15)",color:"#f5576c",fontSize:12,fontWeight:700,cursor:"pointer"}}>🗑️</button>
         </div></div>}
       </div>);})}
