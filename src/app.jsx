@@ -6016,7 +6016,7 @@ const NotebookPanel=()=>{
   // Poly art state
   const[polyImporting,setPolyImporting]=useState(false);
   const polyFileRef=React.useRef(null);
-  const[polyDensity,setPolyDensity]=useState(500);
+  const[polyDensity,setPolyDensity]=useState(300);
   const[polyCropImg,setPolyCropImg]=useState(null);
   const[polyCropBox,setPolyCropBox]=useState({x:0,y:0,w:100,h:100});
   const polyPendingColors=React.useRef(0);
@@ -7263,7 +7263,7 @@ const NotebookPanel=()=>{
   }
 
 
-  // ═══ POLY ART ENGINE — Delaunay triangulation ═══
+  // ═══ POLY ART ENGINE — grid-jittered triangulation ═══
   const generatePolyArt=(imgSrc,numPoints,colorCount,callback)=>{
     const img=new Image();img.onerror=()=>{alert("Failed to load image");callback(null);};
     img.onload=()=>{
@@ -7273,7 +7273,7 @@ const NotebookPanel=()=>{
       const tc=document.createElement("canvas");tc.width=w;tc.height=h;
       const tctx=tc.getContext("2d");tctx.drawImage(img,0,0,w,h);
       const data=tctx.getImageData(0,0,w,h).data;
-      // Edge detection for point placement (Sobel)
+      // Edge detection for adaptive point density
       const gray=new Float32Array(w*h);
       for(let i=0;i<w*h;i++)gray[i]=(data[i*4]*0.299+data[i*4+1]*0.587+data[i*4+2]*0.114)/255;
       const edges=new Float32Array(w*h);
@@ -7282,97 +7282,83 @@ const NotebookPanel=()=>{
         const gy=gray[(y+1)*w+x-1]-gray[(y-1)*w+x-1]+2*(gray[(y+1)*w+x]-gray[(y-1)*w+x])+gray[(y+1)*w+x+1]-gray[(y-1)*w+x+1];
         edges[y*w+x]=Math.sqrt(gx*gx+gy*gy);
       }
-      // Sample points: more on edges, fewer on flat areas
-      const pts=[{x:0,y:0},{x:w,y:0},{x:0,y:h},{x:w,y:h},{x:w/2,y:0},{x:0,y:h/2},{x:w,y:h/2},{x:w/2,y:h}];
-      // Add edge points along borders
-      for(let i=1;i<8;i++){pts.push({x:w*i/8,y:0});pts.push({x:w*i/8,y:h});pts.push({x:0,y:h*i/8});pts.push({x:w,y:h*i/8});}
-      // Weighted random sampling
-      let maxEdge=0;for(let i=0;i<edges.length;i++)if(edges[i]>maxEdge)maxEdge=edges[i];
-      const threshold=maxEdge*0.15;let attempts=0;
-      while(pts.length<numPoints&&attempts<numPoints*10){
-        const x=Math.random()*w,y=Math.random()*h;
-        const ix=Math.floor(x),iy=Math.floor(y);
-        const edgeVal=ix>=0&&ix<w&&iy>=0&&iy<h?edges[iy*w+ix]:0;
-        // Higher edge = higher probability of keeping the point
-        if(Math.random()<(edgeVal/maxEdge*0.7+0.3)||edgeVal>threshold){
-          // Check minimum distance
-          let tooClose=false;const minDist=Math.max(3,Math.sqrt(w*h/numPoints)*0.4);
-          for(let j=pts.length-1;j>=Math.max(0,pts.length-50);j--){
-            const dx2=pts[j].x-x,dy2=pts[j].y-y;
-            if(dx2*dx2+dy2*dy2<minDist*minDist){tooClose=true;break;}
-          }
-          if(!tooClose)pts.push({x,y});
+      // Generate points on a jittered grid, denser near edges
+      const cellSize=Math.sqrt(w*h/numPoints);
+      const cols=Math.ceil(w/cellSize),rows=Math.ceil(h/cellSize);
+      const pts=[];
+      // Border points for clean edges
+      for(let i=0;i<=cols;i++){pts.push({x:i*cellSize,y:0});pts.push({x:i*cellSize,y:h});}
+      for(let i=1;i<rows;i++){pts.push({x:0,y:i*cellSize});pts.push({x:w,y:i*cellSize});}
+      // Interior points
+      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+        const cx=c*cellSize+cellSize/2,cy=r*cellSize+cellSize/2;
+        const ix=Math.min(w-1,Math.floor(cx)),iy=Math.min(h-1,Math.floor(cy));
+        const edgeVal=edges[iy*w+ix];
+        // Add main point with jitter
+        const jitter=cellSize*0.4;
+        pts.push({x:cx+(Math.random()-0.5)*jitter,y:cy+(Math.random()-0.5)*jitter});
+        // Add extra point near edges
+        if(edgeVal>0.15){
+          pts.push({x:cx+(Math.random()-0.5)*jitter*0.5,y:cy+(Math.random()-0.5)*jitter*0.5});
         }
-        attempts++;
       }
-      // Delaunay triangulation (Bowyer-Watson)
-      const triangulate=(points)=>{
-        const st=[{x:-w*10,y:-h*10},{x:w*20,y:-h*10},{x:w/2,y:h*20}];
-        let triangles=[{a:0,b:1,c:2}];
-        const allPts=[...st];
-        for(let i=0;i<points.length;i++){
-          const p=points[i];allPts.push(p);const pi=allPts.length-1;
-          const bad=[];
-          triangles.forEach((t,ti)=>{
-            const pa=allPts[t.a],pb=allPts[t.b],pc=allPts[t.c];
-            // Circumcircle test
-            const ax2=pa.x-p.x,ay2=pa.y-p.y,bx2=pb.x-p.x,by2=pb.y-p.y,cx2=pc.x-p.x,cy2=pc.y-p.y;
-            const det=ax2*(by2*cx2*cx2+by2*cy2*cy2-cy2*bx2*bx2-cy2*by2*by2)-ay2*(bx2*cx2*cx2+bx2*cy2*cy2-cx2*bx2*bx2-cx2*by2*by2)+(ax2*ax2+ay2*ay2)*(bx2*cy2-cx2*by2);
-            // Simpler: compute circumcircle
-            const D=2*(pa.x*(pb.y-pc.y)+pb.x*(pc.y-pa.y)+pc.x*(pa.y-pb.y));
-            if(Math.abs(D)<1e-10)return;
-            const ux=((pa.x*pa.x+pa.y*pa.y)*(pb.y-pc.y)+(pb.x*pb.x+pb.y*pb.y)*(pc.y-pa.y)+(pc.x*pc.x+pc.y*pc.y)*(pa.y-pb.y))/D;
-            const uy=((pa.x*pa.x+pa.y*pa.y)*(pc.x-pb.x)+(pb.x*pb.x+pb.y*pb.y)*(pa.x-pc.x)+(pc.x*pc.x+pc.y*pc.y)*(pb.x-pa.x))/D;
-            const r2=(pa.x-ux)*(pa.x-ux)+(pa.y-uy)*(pa.y-uy);
-            const d2=(p.x-ux)*(p.x-ux)+(p.y-uy)*(p.y-uy);
-            if(d2<r2)bad.push(ti);
-          });
-          // Find boundary polygon
-          const edgesMap=new Map();
-          bad.forEach(ti=>{const t=triangles[ti];
-            [[t.a,t.b],[t.b,t.c],[t.c,t.a]].forEach(([a,b])=>{
-              const k=Math.min(a,b)+"-"+Math.max(a,b);edgesMap.set(k,(edgesMap.get(k)||0)+1);
-            });
-          });
-          const boundary=[];
-          bad.forEach(ti=>{const t=triangles[ti];
-            [[t.a,t.b],[t.b,t.c],[t.c,t.a]].forEach(([a,b])=>{
-              const k=Math.min(a,b)+"-"+Math.max(a,b);
-              if(edgesMap.get(k)===1)boundary.push([a,b]);
-            });
-          });
-          // Remove bad triangles (reverse order)
-          bad.sort((a,b)=>b-a).forEach(ti=>triangles.splice(ti,1));
-          // Add new triangles
-          boundary.forEach(([a,b])=>triangles.push({a,b,c:pi}));
-        }
-        // Remove triangles using super-triangle vertices
-        return triangles.filter(t=>t.a>2&&t.b>2&&t.c>2).map(t=>({a:t.a-3,b:t.b-3,c:t.c-3}));
-      };
-      const tris=triangulate(pts);
-      // Color each triangle: average color of sampled pixels inside, mapped to DMC
+      // Clamp points
+      pts.forEach(p=>{p.x=Math.max(0,Math.min(w,p.x));p.y=Math.max(0,Math.min(h,p.y));});
+      // Simple Delaunay via incremental ear-clipping-like approach
+      // Use a fast O(n log n) sweep approach: sort by x, build triangulation
+      // Actually use a simpler approach: for each grid cell, create 2 triangles, then relax
+      const tris=[];
+      // Create triangulation from points using a simple approach:
+      // Sort points, then do a fan triangulation from nearest neighbors
+      // Better: use grid-based triangulation which is guaranteed to work
+      const gridW=cols+1,gridH=rows+1;
+      const gridPts=[];
+      // Create a regular grid of points first
+      for(let r=0;r<=rows;r++)for(let c=0;c<=cols;c++){
+        const x=Math.min(w,c*cellSize),y=Math.min(h,r*cellSize);
+        const jitter=cellSize*0.35;
+        const ix=Math.min(w-1,Math.floor(x)),iy=Math.min(h-1,Math.floor(y));
+        const edgeVal=(ix>0&&iy>0&&ix<w-1&&iy<h-1)?edges[iy*w+ix]:0;
+        const j=edgeVal>0.15?jitter*0.3:jitter;
+        // Don't jitter border points
+        const isBorder=r===0||r===rows||c===0||c===cols;
+        gridPts.push({
+          x:isBorder?x:x+(Math.random()-0.5)*j*2,
+          y:isBorder?y:y+(Math.random()-0.5)*j*2
+        });
+      }
+      // Create triangles from grid (2 triangles per cell)
+      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+        const tl=r*gridW+c,tr=tl+1,bl=(r+1)*gridW+c,br=bl+1;
+        if(Math.random()<0.5){tris.push({a:tl,b:tr,c:bl});tris.push({a:tr,b:br,c:bl});}
+        else{tris.push({a:tl,b:tr,c:br});tris.push({a:tl,b:br,c:bl});}
+      }
+      // Color each triangle
       const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
       const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
-      const nearFull=(r,g,b)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
+      const nearFull=(r2,g2,b2)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r2-pr)**2+(g2-pg)**2+(b2-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
       const outCanvas=document.createElement("canvas");outCanvas.width=w;outCanvas.height=h;
-      const octx=outCanvas.getContext("2d");octx.fillStyle="#fff";octx.fillRect(0,0,w,h);
+      const octx=outCanvas.getContext("2d");
       const votes=new Map();
       tris.forEach(t=>{
-        const pa=pts[t.a],pb=pts[t.b],pc=pts[t.c];
-        // Sample center + a few points
+        const pa=gridPts[t.a],pb=gridPts[t.b],pc=gridPts[t.c];
         const cx2=(pa.x+pb.x+pc.x)/3,cy2=(pa.y+pb.y+pc.y)/3;
+        // Sample multiple points inside triangle for better color
         let sr=0,sg=0,sb=0,sc=0;
-        [[cx2,cy2],[pa.x*.5+pb.x*.25+pc.x*.25,pa.y*.5+pb.y*.25+pc.y*.25],[pa.x*.25+pb.x*.5+pc.x*.25,pa.y*.25+pb.y*.5+pc.y*.25],[pa.x*.25+pb.x*.25+pc.x*.5,pa.y*.25+pb.y*.25+pc.y*.5]].forEach(([sx,sy])=>{
-          const ix=Math.floor(sx),iy=Math.floor(sy);
-          if(ix>=0&&ix<w&&iy>=0&&iy<h){const idx=(iy*w+ix)*4;sr+=data[idx];sg+=data[idx+1];sb+=data[idx+2];sc++;}
-        });
+        for(let s=0;s<5;s++){
+          const r1=Math.random(),r2s=Math.random();
+          const sq=Math.sqrt(r1);
+          const sx=(1-sq)*pa.x+sq*(1-r2s)*pb.x+sq*r2s*pc.x;
+          const sy=(1-sq)*pa.y+sq*(1-r2s)*pb.y+sq*r2s*pc.y;
+          const ix=Math.max(0,Math.min(w-1,Math.floor(sx))),iy=Math.max(0,Math.min(h-1,Math.floor(sy)));
+          const idx=(iy*w+ix)*4;sr+=data[idx];sg+=data[idx+1];sb+=data[idx+2];sc++;
+        }
         if(sc===0)return;sr/=sc;sg/=sc;sb/=sc;
         const ci=nearFull(sr,sg,sb);votes.set(ci,(votes.get(ci)||0)+1);
         octx.fillStyle=fullPal[ci];octx.strokeStyle=fullPal[ci];octx.lineWidth=0.5;octx.lineJoin="round";
         octx.beginPath();octx.moveTo(pa.x,pa.y);octx.lineTo(pb.x,pb.y);octx.lineTo(pc.x,pc.y);octx.closePath();octx.fill();octx.stroke();
       });
       const pngUrl=outCanvas.toDataURL("image/png");
-      // Top N colors
       const topColors=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,colorCount===0?votes.size:colorCount);
       const colorInfo=topColors.map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
       callback({pngUrl,width:w,height:h,colors:colorInfo});
@@ -7437,7 +7423,7 @@ const NotebookPanel=()=>{
             style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{polyImporting?"...":"📷"+o.l}</button>))}
         <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
         <span style={{fontSize:9,opacity:.4}}>Density:</span>
-        {[{v:200,l:"Low"},{v:500,l:"Med"},{v:1000,l:"High"},{v:2000,l:"Ultra"}].map(d=>(
+        {[{v:100,l:"Low"},{v:300,l:"Med"},{v:600,l:"High"},{v:1200,l:"Ultra"}].map(d=>(
           <button key={d.v} onClick={()=>setPolyDensity(d.v)} style={{padding:"2px 5px",borderRadius:6,fontSize:9,fontWeight:700,border:polyDensity===d.v?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:polyDensity===d.v?"rgba(102,126,234,.15)":"transparent",color:polyDensity===d.v?"#a8b4f0":"#666",cursor:"pointer"}}>{d.l}</button>))}
       </div>
       {/* Row 3: actions */}
