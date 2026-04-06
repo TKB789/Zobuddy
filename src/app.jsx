@@ -6007,6 +6007,12 @@ const NotebookPanel=()=>{
   const[vecDrawSize,setVecDrawSize]=useState(3);
   const[vecDrawEraser,setVecDrawEraser]=useState(false);
   const vecCropDrag=React.useRef(null);
+  const vecDrawHistory=React.useRef([]);
+  const vecDrawHistoryIdx=React.useRef(-1);
+  const[vecEyedropper,setVecEyedropper]=useState(false);
+  const vecPushHistory=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const snap=c.toDataURL();vecDrawHistory.current=vecDrawHistory.current.slice(0,vecDrawHistoryIdx.current+1);vecDrawHistory.current.push(snap);if(vecDrawHistory.current.length>30)vecDrawHistory.current.shift();vecDrawHistoryIdx.current=vecDrawHistory.current.length-1;};
+  const vecUndoDraw=()=>{if(vecDrawHistoryIdx.current<=0)return;vecDrawHistoryIdx.current--;const c=vecDrawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);const img2=new Image();img2.onload=()=>{ctx.drawImage(img2,0,0);saveVecDraw();};img2.src=vecDrawHistory.current[vecDrawHistoryIdx.current];};
+  const vecRedoDraw=()=>{if(vecDrawHistoryIdx.current>=vecDrawHistory.current.length-1)return;vecDrawHistoryIdx.current++;const c=vecDrawCanvasRef.current;if(!c)return;const ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);const img2=new Image();img2.onload=()=>{ctx.drawImage(img2,0,0);saveVecDraw();};img2.src=vecDrawHistory.current[vecDrawHistoryIdx.current];};
   // Poly art state
   const[polyImporting,setPolyImporting]=useState(false);
   const polyFileRef=React.useRef(null);
@@ -6085,6 +6091,7 @@ const NotebookPanel=()=>{
   };
   const saveAll=()=>{saveText();saveCanvas();};
   const doSave=()=>{saveAll();setSaved(true);setTimeout(()=>setSaved(false),1500);};
+  const saveAsPng=(dataUrl,title)=>{const a=document.createElement("a");a.href=dataUrl;a.download=(title||"image")+".png";a.click();};
   const syncState=()=>setNbData(readNb());
 
   // Full save: saves to localStorage and syncs React state
@@ -6845,6 +6852,7 @@ const NotebookPanel=()=>{
         <div style={{flex:1}}/>
         <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.12)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",fontSize:10,padding:"3px 8px"}:{fontSize:10,padding:"3px 8px",color:"#888"})}>💾 {saved?"Saved":"Save"}</button>
         <button onClick={printPixelArt} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>
+        <button onClick={()=>{const c=pixCanvasRef.current;if(c)saveAsPng(c.toDataURL("image/png"),nbData.pages[nbPageIdx]?.title||"pixel-art");}} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 PNG</button>
         <button onClick={archiveCurrentPage} style={btn({color:"#888",fontSize:10,padding:"3px 8px"})}>🗃 Archive</button>
         <button onClick={deleteCurrentPage} style={btn({color:"#888",fontSize:10,padding:"3px 8px"})}>🗑 Delete</button>
       </div>
@@ -7111,6 +7119,7 @@ const NotebookPanel=()=>{
         }} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Multi-Page</button>}
         {vecSvg&&<button onClick={()=>{const blob=new Blob([vecSvg],{type:"image/svg+xml"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(page.title||"vector")+".svg";a.click();URL.revokeObjectURL(url);}}
           style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 SVG</button>}
+        {vecPng&&<button onClick={()=>saveAsPng(vecPng,page.title||"flat-art")} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 PNG</button>}
         <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗃️</button>
         <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗑️</button>
       </div>
@@ -7179,15 +7188,19 @@ const NotebookPanel=()=>{
       {/* Draw toolbar — uses DMC palette from conversion */}
       {vecDrawMode&&hasVecContent&&<div style={{display:"flex",flexDirection:"column",gap:3,padding:"2px 10px 4px",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-          <button onClick={()=>{saveVecDraw();setVecDrawMode(false);}} style={btn({background:"rgba(102,126,234,.15)",border:"1px solid rgba(102,126,234,.3)",color:"#a8b4f0",padding:"3px 8px",fontSize:10})}>Done</button>
-          <button onClick={()=>setVecDrawEraser(e=>!e)} style={btn(vecDrawEraser?{background:"rgba(245,87,108,.2)",border:"1px solid rgba(245,87,108,.4)",color:"#f5576c",padding:"3px 8px",fontSize:10}:{padding:"3px 8px",fontSize:10,color:"#888"})}>{vecDrawEraser?"🧹":"✏️"}</button>
+          <button onClick={()=>{saveVecDraw();setVecDrawMode(false);setVecEyedropper(false);}} style={btn({background:"rgba(102,126,234,.15)",border:"1px solid rgba(102,126,234,.3)",color:"#a8b4f0",padding:"3px 8px",fontSize:10})}>Done</button>
+          <button onClick={vecUndoDraw} style={btn({color:"#aaa",padding:"3px 8px",fontSize:10})}>↩</button>
+          <button onClick={vecRedoDraw} style={btn({color:"#aaa",padding:"3px 8px",fontSize:10})}>↪</button>
+          <button onClick={()=>{setVecDrawEraser(false);setVecEyedropper(e=>!e);}} style={btn(vecEyedropper?{background:"rgba(67,233,123,.2)",border:"1px solid rgba(67,233,123,.4)",color:"#43e97b",padding:"3px 8px",fontSize:10}:{padding:"3px 8px",fontSize:10,color:"#888"})}>💧</button>
+          <button onClick={()=>{setVecEyedropper(false);setVecDrawEraser(e=>!e);}} style={btn(vecDrawEraser?{background:"rgba(245,87,108,.2)",border:"1px solid rgba(245,87,108,.4)",color:"#f5576c",padding:"3px 8px",fontSize:10}:{padding:"3px 8px",fontSize:10,color:"#888"})}>{vecDrawEraser?"🧹":"✏️"}</button>
           {[2,4,8,14].map(s=><div key={s} onClick={()=>setVecDrawSize(s)} style={{width:22,height:22,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:6,background:vecDrawSize===s?"rgba(255,255,255,.12)":"transparent",border:vecDrawSize===s?"1px solid "+vecDrawColor:"1px solid transparent",cursor:"pointer"}}><div style={{width:Math.max(s,2),height:Math.max(s,2),borderRadius:"50%",background:vecDrawEraser?"rgba(245,87,108,.7)":vecDrawColor}}/></div>)}
+          <div style={{width:18,height:18,borderRadius:4,background:vecDrawColor,border:"2px solid #feca57",flexShrink:0}}/>
         </div>
         {/* Quick colors from the conversion palette */}
         <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-          {vecColors.slice(0,18).map((c,i)=><div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);}} title={`DMC ${c.dmc?.n} ${c.dmc?.nm}`}
+          {vecColors.slice(0,24).map((c,i)=><div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);setVecEyedropper(false);}} title={`DMC ${c.dmc?.n} ${c.dmc?.nm}`}
             style={{width:22,height:22,borderRadius:4,background:c.color,border:vecDrawColor===c.color&&!vecDrawEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",boxSizing:"border-box"}}/>)}
-          {vecColors.length===0&&["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);}} style={{width:22,height:22,borderRadius:4,background:c,border:vecDrawColor===c&&!vecDrawEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",boxSizing:"border-box"}}/>)}
+          {vecColors.length===0&&["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}} style={{width:22,height:22,borderRadius:4,background:c,border:vecDrawColor===c&&!vecDrawEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",boxSizing:"border-box"}}/>)}
         </div>
       </div>}
       {/* Grid + draw toggle row */}
@@ -7209,20 +7222,30 @@ const NotebookPanel=()=>{
           </svg>}
           {/* Draw overlay canvas */}
           {vecDrawMode&&<canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
-            // Load existing drawing
             const d=readNb();const dd=d.pages?.[pageIdxRef.current]?.vecDrawData;
-            if(dd){const img2=new Image();img2.onload=()=>{el.getContext("2d").drawImage(img2,0,0);};img2.src=dd;}
-            // Touch handlers
+            if(dd){const img2=new Image();img2.onload=()=>{el.getContext("2d").drawImage(img2,0,0);vecPushHistory();};img2.src=dd;}else{vecPushHistory();}
             const getXY=(e)=>{const t=e.touches?e.touches[0]:e;const r=el.getBoundingClientRect();return{x:(t.clientX-r.left)*el.width/r.width,y:(t.clientY-r.top)*el.height/r.height};};
-            el.addEventListener("pointerdown",(e)=>{e.preventDefault();vecIsDrawing.current=true;const ctx=el.getContext("2d");const p=getXY(e);
-              if(vecDrawEraser){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=20;}
+            el.addEventListener("pointerdown",(e)=>{e.preventDefault();const p=getXY(e);
+              // Eyedropper: pick color from the base image
+              if(vecEyedropper){
+                const baseImg=el.parentElement?.querySelector("img");if(baseImg){
+                  const tc=document.createElement("canvas");tc.width=baseImg.naturalWidth||800;tc.height=baseImg.naturalHeight||800;
+                  const tctx=tc.getContext("2d");tctx.drawImage(baseImg,0,0,tc.width,tc.height);
+                  const ix=Math.floor(p.x*tc.width/el.width),iy=Math.floor(p.y*tc.height/el.height);
+                  const px=tctx.getImageData(ix,iy,1,1).data;
+                  const hex="#"+[px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,"0")).join("");
+                  setVecDrawColor(hex);setVecEyedropper(false);
+                }return;
+              }
+              vecIsDrawing.current=true;const ctx=el.getContext("2d");
+              if(vecDrawEraser){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=vecDrawSize*3;}
               else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=vecDrawColor;ctx.lineWidth=vecDrawSize;}
-              ctx.lineCap="round";ctx.beginPath();ctx.moveTo(p.x,p.y);
-              ctx.beginPath();ctx.arc(p.x,p.y,vecDrawEraser?10:vecDrawSize/2,0,Math.PI*2);ctx.fillStyle=vecDrawEraser?"rgba(0,0,0,1)":vecDrawColor;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);});
+              ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();ctx.moveTo(p.x,p.y);
+              ctx.beginPath();ctx.arc(p.x,p.y,vecDrawEraser?vecDrawSize*1.5:vecDrawSize/2,0,Math.PI*2);ctx.fillStyle=vecDrawEraser?"rgba(0,0,0,1)":vecDrawColor;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);});
             el.addEventListener("pointermove",(e)=>{if(!vecIsDrawing.current)return;e.preventDefault();const ctx=el.getContext("2d");const p=getXY(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
-            el.addEventListener("pointerup",()=>{vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";saveVecDraw();});
-            el.addEventListener("pointerleave",()=>{vecIsDrawing.current=false;saveVecDraw();});
-          }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:"crosshair"}}/>}
+            el.addEventListener("pointerup",()=>{if(vecIsDrawing.current){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveVecDraw();}});
+            el.addEventListener("pointerleave",()=>{if(vecIsDrawing.current){vecIsDrawing.current=false;saveVecDraw();}});
+          }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>}
           {/* Show saved draw overlay when not in draw mode */}
           {!vecDrawMode&&page.vecDrawData&&<img src={page.vecDrawData} style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}/>}
         </div>
@@ -7414,6 +7437,7 @@ const NotebookPanel=()=>{
           if(win){win.document.write(`<html><head><title>${page.title||"Poly Art"}</title><style>@media print{body{margin:0}.no-print{display:none}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${page.title||"Poly Art"}</h3><img src="${polyPng}"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
         }} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>}
         <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗃️</button>
+        {polyPng&&<button onClick={()=>saveAsPng(polyPng,page.title||"poly-art")} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 PNG</button>}
         <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗑️</button>
       </div>
       {/* Thread list */}
@@ -7478,6 +7502,16 @@ const NotebookPanel=()=>{
         <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
         <button onClick={()=>{const title=nbData.pages[nbPageIdx]?.title||"Note";const content=textRef.current||"";const drawSrc=getDrawData();const bg=page.bgColor||"#fff";const light=isLightBg(page.bgColor);const textColor=light?"#1a1a2e":"#333";const win=window.open("","_blank");if(win){win.document.write(`<html><head><title>${title}</title><style>@media print{body{margin:0;padding:0}.page{page-break-inside:avoid}}body{font-family:'Nunito',sans-serif;padding:20px;max-width:700px;margin:0 auto}</style></head><body><h2 style="margin:0 0 12px">${title}</h2><div class="page" style="position:relative;border:1px solid #ddd;border-radius:8px;overflow:hidden;min-height:400px;background:${bg}"><pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:15px;line-height:1.6;padding:16px;margin:0;color:${textColor}">${content.replace(/</g,"&lt;")}</pre>${drawSrc?`<img src="${drawSrc}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none"/>`:""}</div><button onclick="window.print()" style="padding:10px 30px;font-size:16px;margin:12px;cursor:pointer">🖨️ Print</button></body></html>`);win.document.close();}}}
           style={btn({color:"#888",padding:"3px 7px",fontSize:11})}>🖨</button>
+        <button onClick={()=>{
+          const c=document.createElement("canvas");c.width=500;c.height=800;const ctx=c.getContext("2d");
+          const bg=page.bgColor||"#1e1932";ctx.fillStyle=bg;ctx.fillRect(0,0,500,800);
+          const light=isLightBg(page.bgColor);ctx.fillStyle=light?"#1a1a2e":"#e8e0f0";ctx.font="15px sans-serif";
+          const content=textRef.current||"";const lines=content.split("\n");
+          lines.forEach((line,i)=>{ctx.fillText(line,14,24+i*24);});
+          const drawSrc=getDrawData();
+          if(drawSrc){const img2=new Image();img2.onload=()=>{ctx.drawImage(img2,0,0,500,800);saveAsPng(c.toDataURL("image/png"),page.title||"note");};img2.src=drawSrc;}
+          else saveAsPng(c.toDataURL("image/png"),page.title||"note");
+        }} style={btn({color:"#888",padding:"3px 7px",fontSize:11})}>💾</button>
         <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:11})}>🗃️</button>
         <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:11})}>🗑️</button>
       </div>}
