@@ -7790,7 +7790,7 @@ const NotebookPanel=()=>{
         </div>
       </div>}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
-        <div style={{transform:pageDrawMode?undefined:`scale(${pageZoom})`,transformOrigin:"top left",width:pageDrawMode?undefined:`${100/pageZoom}%`}}>
+        <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:`${100/pageZoom}%`}}>
           <PageBg type={page.type} bgColor={page.bgColor}>
             {!pageDrawMode&&<div style={{position:"relative"}}>
               {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",height:800,pointerEvents:"none",opacity:.7,zIndex:2}}/>}
@@ -7804,17 +7804,14 @@ const NotebookPanel=()=>{
               } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type,page.bgColor),position:"relative",zIndex:1}}/>
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}}>
-              {(()=>{const baseTs=ts(page.type,page.bgColor);const scaledPadding=(()=>{
-                const p=baseTs.padding;if(typeof p==="number")return `${p*pageZoom}px`;
-                const parts=p.split(" ").map(v=>parseFloat(v)*pageZoom+"px");return parts.join(" ");
-              })();return <div style={{position:"absolute",top:0,left:0,width:500*pageZoom,minHeight:800*pageZoom,
-                padding:scaledPadding,fontSize:`${(baseTs.fontSize||15)*pageZoom}px`,
-                lineHeight:typeof baseTs.lineHeight==="string"&&baseTs.lineHeight.endsWith("px")?`${parseFloat(baseTs.lineHeight)*pageZoom}px`:baseTs.lineHeight,
+              {(()=>{const baseTs=ts(page.type,page.bgColor);return <div style={{position:"absolute",top:0,left:0,width:500,minHeight:800,
+                padding:baseTs.padding,fontSize:`${baseTs.fontSize||15}px`,
+                lineHeight:baseTs.lineHeight,
                 fontFamily:baseTs.fontFamily||"'Nunito',sans-serif",
                 color:"rgba(232,224,240,.4)",whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0,
                 boxSizing:"border-box"}}>{textRef.current}</div>;})()}
               <canvas ref={canvasCallbackRef} width={500} height={800}
-                style={{width:500*pageZoom,height:800*pageZoom,touchAction:"pan-x pan-y pinch-zoom",background:"transparent",display:"block",position:"relative",zIndex:1}}/>
+                style={{width:500,height:800,touchAction:"pan-x pan-y pinch-zoom",background:"transparent",display:"block",position:"relative",zIndex:1}}/>
             </div>}
           </PageBg>
         </div></div></div>);
@@ -8019,24 +8016,8 @@ const LearnPanel=()=>{
 
   return(
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      {totalFavs>0&&<div style={{padding:"8px 14px 0",flexShrink:0}}>
-        <button onClick={()=>setShowFavs(!showFavs)} style={{background:showFavs?"rgba(254,202,87,.15)":"rgba(255,255,255,.06)",border:showFavs?"1px solid rgba(254,202,87,.3)":"1px solid rgba(255,255,255,.06)",borderRadius:8,padding:"4px 10px",fontSize:13,fontWeight:700,color:showFavs?"#feca57":"#888",cursor:"pointer"}}>⭐ {totalFavs} Favorites {showFavs?"▲":"▼"}</button>
-      </div>}
-      {showFavs&&<div style={{padding:"6px 14px",maxHeight:240,overflowY:"auto",flexShrink:0}}>
-        <div style={{background:"rgba(254,202,87,.06)",border:"1px solid rgba(254,202,87,.15)",borderRadius:12,padding:8}}>
-          {(learnFavs.quotes||[]).map((q,i)=>(<div key={"fq"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>💬</span><span style={{flex:1,fontSize:12,fontStyle:"italic",opacity:.7}}>"{q.q}" — {q.a}</span><button onClick={()=>toggleSimpleFav("quotes",q,x=>x.q===q.q)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.facts||[]).map((f,i)=>(<div key={"ff"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>🧠</span><span style={{flex:1,fontSize:12,opacity:.7}}>{f.text}</span><button onClick={()=>toggleSimpleFav("facts",f,x=>x.text===f.text)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.words||[]).map((w,i)=>(<div key={"fw"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>📖</span><span style={{flex:1,fontSize:12}}><strong style={{color:"#60a5fa"}}>{w.word}</strong> — <span style={{opacity:.5}}>{w.def}</span></span><button onClick={()=>toggleSimpleFav("words",w,x=>x.word===w.word)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.mindful||[]).map((m,i)=>(<div key={"fm"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{m.icon}</span><span style={{flex:1,fontSize:12,opacity:.7}}>{m.practice}</span><button onClick={()=>toggleSimpleFav("mindful",m,x=>x.practice===m.practice)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.tips||[]).map((t,i)=>(<div key={"fti"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{t.icon}</span><span style={{flex:1,fontSize:12,opacity:.7}}>{t.tip}</span><button onClick={()=>toggleSimpleFav("tips",t,x=>x.tip===t.tip)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {learnFavs.teds.map((t,i)=>(<div key={"ft"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>🎤</span><a href={t.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#f093fb",fontSize:12,fontWeight:700,textDecoration:"none"}}>{t.title}</a><button onClick={()=>toggleTedFav(t)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {learnFavs.books.map((b,i)=>(<div key={"fb"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>📚</span><span style={{flex:1,fontSize:12}}><span style={{color:"#fbbf24",fontWeight:700}}>{b.title}</span><span style={{opacity:.4}}> — {b.author}</span></span><button onClick={()=>toggleBookFav(b)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {learnFavs.courses.map((c,i)=>(<div key={"fc"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{c.icon||"📖"}</span><a href={c.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#22d3ee",fontSize:12,fontWeight:700,textDecoration:"none"}}>{c.name}</a><button onClick={()=>toggleCourseFav(c)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.news||[]).map((n,i)=>(<div key={"fn"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{n.icon}</span><a href={n.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#a8b4f0",fontSize:12,fontWeight:700,textDecoration:"none"}}>{n.name}</a><button onClick={()=>toggleSimpleFav("news",n,x=>x.name===n.name)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-        </div>
-      </div>}
       <div style={{display:"flex",gap:3,padding:"8px 12px 8px",flexShrink:0}}>
-        {[{id:"picks",label:"🌱 Picks"},{id:"news",label:"⭐ Fave Sites"},{id:"flash",label:"📒 Flashcards"}].map(t=>(
+        {[{id:"picks",label:"🌱 Picks"},{id:"news",label:"⭐ Favorites"},{id:"flash",label:"📒 Flashcards"}].map(t=>(
           <button key={t.id} onClick={()=>setLearnTab(t.id)}
             style={{flex:1,padding:"7px 2px",borderRadius:10,border:learnTab===t.id?"1px solid rgba(102,126,234,.4)":"1px solid rgba(255,255,255,.06)",
               background:learnTab===t.id?"rgba(102,126,234,.12)":"rgba(255,255,255,.03)",
@@ -8060,8 +8041,25 @@ const LearnPanel=()=>{
         <Card icon={course.icon} title="Free Course" color="rgba(34,211,238)" link={course.url} onFav={()=>toggleCourseFav(course)} isFav={isCourseFav(course)}><div style={{fontSize:16,fontWeight:700}}>{course.name}</div><div style={{fontSize:14,opacity:.5}}>{course.source} • {course.cat}</div></Card>
       </div>}
       {learnTab==="news"&&<div style={{flex:1,overflowY:"auto",padding:"0 14px 14px"}}>
+        {/* Saved Favorites */}
+        {totalFavs>0&&<div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:700,opacity:.35,marginBottom:6}}>SAVED FAVORITES ({totalFavs})</div>
+          <div style={{background:"rgba(254,202,87,.06)",border:"1px solid rgba(254,202,87,.15)",borderRadius:12,padding:8}}>
+          {(learnFavs.quotes||[]).map((q,i)=>(<div key={"fq"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>💬</span><span style={{flex:1,fontSize:12,fontStyle:"italic",opacity:.7}}>"{q.q}" — {q.a}</span><button onClick={()=>toggleSimpleFav("quotes",q,x=>x.q===q.q)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {(learnFavs.facts||[]).map((f,i)=>(<div key={"ff"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>🧠</span><span style={{flex:1,fontSize:12,opacity:.7}}>{f.text}</span><button onClick={()=>toggleSimpleFav("facts",f,x=>x.text===f.text)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {(learnFavs.words||[]).map((w,i)=>(<div key={"fw"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>📖</span><span style={{flex:1,fontSize:12}}><strong style={{color:"#60a5fa"}}>{w.word}</strong> — <span style={{opacity:.5}}>{w.def}</span></span><button onClick={()=>toggleSimpleFav("words",w,x=>x.word===w.word)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {(learnFavs.mindful||[]).map((m,i)=>(<div key={"fm"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{m.icon}</span><span style={{flex:1,fontSize:12,opacity:.7}}>{m.practice}</span><button onClick={()=>toggleSimpleFav("mindful",m,x=>x.practice===m.practice)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {(learnFavs.tips||[]).map((t,i)=>(<div key={"fti"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{t.icon}</span><span style={{flex:1,fontSize:12,opacity:.7}}>{t.tip}</span><button onClick={()=>toggleSimpleFav("tips",t,x=>x.tip===t.tip)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {learnFavs.teds.map((t,i)=>(<div key={"ft"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>🎤</span><a href={t.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#f093fb",fontSize:12,fontWeight:700,textDecoration:"none"}}>{t.title}</a><button onClick={()=>toggleTedFav(t)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {learnFavs.books.map((b,i)=>(<div key={"fb"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>📚</span><span style={{flex:1,fontSize:12}}><span style={{color:"#fbbf24",fontWeight:700}}>{b.title}</span><span style={{opacity:.4}}> — {b.author}</span></span><button onClick={()=>toggleBookFav(b)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {learnFavs.courses.map((c,i)=>(<div key={"fc"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{c.icon||"📖"}</span><a href={c.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#22d3ee",fontSize:12,fontWeight:700,textDecoration:"none"}}>{c.name}</a><button onClick={()=>toggleCourseFav(c)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          {(learnFavs.news||[]).map((n,i)=>(<div key={"fn"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{n.icon}</span><a href={n.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#a8b4f0",fontSize:12,fontWeight:700,textDecoration:"none"}}>{n.name}</a><button onClick={()=>toggleSimpleFav("news",n,x=>x.name===n.name)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          </div>
+        </div>}
+        {totalFavs===0&&<div style={{textAlign:"center",padding:"16px 0 12px",opacity:.35,fontSize:13}}>Star items from Picks to save them here</div>}
+        {/* Fave Sites */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={{fontSize:14,opacity:.4}}>Tap any site to visit</div>
+          <div style={{fontSize:12,fontWeight:700,opacity:.35}}>FAVORITE SITES</div>
           <button onClick={()=>setShowAddNews(!showAddNews)} style={{background:showAddNews?"rgba(102,126,234,.15)":"rgba(255,255,255,.06)",border:showAddNews?"1px solid rgba(102,126,234,.3)":"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:"4px 10px",fontSize:12,color:showAddNews?"#a8b4f0":"#888",cursor:"pointer",fontWeight:700}}>{showAddNews?"Cancel":"+ Add Site"}</button>
         </div>
         {showAddNews&&<div style={{background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
