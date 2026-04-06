@@ -7234,27 +7234,43 @@ const NotebookPanel=()=>{
           {vecDrawMode&&<canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
             const d=readNb();const dd=d.pages?.[pageIdxRef.current]?.vecDrawData;
             if(dd){const img2=new Image();img2.onload=()=>{el.getContext("2d").drawImage(img2,0,0);vecPushHistory();};img2.src=dd;}else{vecPushHistory();}
-            const getXY=(e)=>{const t=e.touches?e.touches[0]:e;const r=el.getBoundingClientRect();return{x:(t.clientX-r.left)*el.width/r.width,y:(t.clientY-r.top)*el.height/r.height};};
-            el.addEventListener("pointerdown",(e)=>{e.preventDefault();const p=getXY(e);
-              if(vecEyedropperRef.current){
-                const baseImg=el.parentElement?.querySelector("img");if(baseImg){
-                  const tc=document.createElement("canvas");tc.width=baseImg.naturalWidth||800;tc.height=baseImg.naturalHeight||800;
-                  const tctx=tc.getContext("2d");tctx.drawImage(baseImg,0,0,tc.width,tc.height);
-                  const ix=Math.floor(p.x*tc.width/el.width),iy=Math.floor(p.y*tc.height/el.height);
-                  const px=tctx.getImageData(ix,iy,1,1).data;
-                  const hex="#"+[px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,"0")).join("");
-                  setVecDrawColor(hex);setVecEyedropper(false);
-                }return;
+            const getXY=(e)=>{const r=el.getBoundingClientRect();return{x:(e.clientX-r.left)*el.width/r.width,y:(e.clientY-r.top)*el.height/r.height};};
+            let pinching=false;let lastPinchDist=0;
+            el.addEventListener("touchstart",(e)=>{
+              if(e.touches.length>=2){pinching=true;vecIsDrawing.current=false;
+                const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+                lastPinchDist=Math.sqrt(dx*dx+dy*dy);e.preventDefault();return;}
+              if(e.touches.length===1&&!pinching){
+                e.preventDefault();const p=getXY(e.touches[0]);
+                if(vecEyedropperRef.current){
+                  const baseImg=el.parentElement?.querySelector("img");if(baseImg){
+                    const tc2=document.createElement("canvas");tc2.width=baseImg.naturalWidth||800;tc2.height=baseImg.naturalHeight||800;
+                    tc2.getContext("2d").drawImage(baseImg,0,0,tc2.width,tc2.height);
+                    const ix=Math.floor(p.x*tc2.width/el.width),iy=Math.floor(p.y*tc2.height/el.height);
+                    const px=tc2.getContext("2d").getImageData(ix,iy,1,1).data;
+                    setVecDrawColor("#"+[px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,"0")).join(""));setVecEyedropper(false);
+                  }return;}
+                vecIsDrawing.current=true;const ctx=el.getContext("2d");
+                const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
+                if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
+                else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
+                ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();ctx.moveTo(p.x,p.y);
+                ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);
               }
-              vecIsDrawing.current=true;const ctx=el.getContext("2d");
-              const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
-              if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
-              else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
-              ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();ctx.moveTo(p.x,p.y);
-              ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);});
-            el.addEventListener("pointermove",(e)=>{if(!vecIsDrawing.current)return;e.preventDefault();const ctx=el.getContext("2d");const p=getXY(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
-            el.addEventListener("pointerup",()=>{if(vecIsDrawing.current){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveVecDraw();}});
-            el.addEventListener("pointerleave",()=>{if(vecIsDrawing.current){vecIsDrawing.current=false;saveVecDraw();}});
+            },{passive:false});
+            el.addEventListener("touchmove",(e)=>{
+              if(e.touches.length>=2){e.preventDefault();
+                const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+                const dist=Math.sqrt(dx*dx+dy*dy);
+                if(lastPinchDist>0){const scale=dist/lastPinchDist;setPageZoom(z=>Math.max(0.3,Math.min(6,z*scale)));}
+                lastPinchDist=dist;return;}
+              if(!vecIsDrawing.current||pinching)return;e.preventDefault();
+              const p=getXY(e.touches[0]);const ctx=el.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke();
+            },{passive:false});
+            el.addEventListener("touchend",(e)=>{
+              if(e.touches.length<2)pinching=false;
+              if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveVecDraw();}
+            });
           }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>}
           {/* Show saved draw overlay when not in draw mode */}
           {!vecDrawMode&&page.vecDrawData&&<img src={page.vecDrawData} style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}/>}
