@@ -163,13 +163,35 @@ const FILTERS = [
 ];
 
 const LEVEL_REQUIREMENTS = [
-  { level:1,auraDays:0,name:"Seedling" },{ level:2,auraDays:3,name:"Sprout" },
-  { level:3,auraDays:7,name:"Bloom" },{ level:4,auraDays:14,name:"Guardian" },
-  { level:5,auraDays:21,name:"Champion" },{ level:6,auraDays:30,name:"Legend" },
-  { level:7,auraDays:60,name:"Mythic" },
+  { level:1,xp:0,name:"Seedling" },{ level:2,xp:30,name:"Sprout" },
+  { level:3,xp:80,name:"Bloom" },{ level:4,xp:180,name:"Guardian" },
+  { level:5,xp:350,name:"Champion" },{ level:6,xp:600,name:"Legend" },
+  { level:7,xp:1000,name:"Mythic" },
 ];
 const RARITIES=["Common","Uncommon","Rare","Epic","Legendary","Mythic","TRANSCENDENT"];
 const RARITY_COLORS={Common:"#aaa",Uncommon:"#4ade80",Rare:"#60a5fa",Epic:"#c084fc",Legendary:"#fbbf24",Mythic:"#f472b6",TRANSCENDENT:"#67e8f9"};
+
+// Calculate XP from activity — this is cumulative and never decreases
+const calcXP=(s)=>{
+  if(!s)return 0;
+  const days=s.startDate?getDaysBetween(s.startDate,getToday())+1:0;
+  const totalCompletions=Object.values(s.completionLog||{}).reduce((a,d)=>a+(d?.length||0),0);
+  const streak=s.auraStreak||0;
+  // XP sources: days active + completions + streak bonus
+  const dayXP=days*2;              // 2 XP per day active
+  const compXP=totalCompletions*3; // 3 XP per goal completion
+  const streakBonus=streak*2;      // 2 XP bonus per current streak day
+  const calculated=dayXP+compXP+streakBonus;
+  // Never go below saved high-water mark
+  return Math.max(calculated, s.highXP||0);
+};
+
+const getLevel=(s)=>{
+  const xp=calcXP(s);
+  let l=LEVEL_REQUIREMENTS[0];
+  for(const r of LEVEL_REQUIREMENTS)if(xp>=r.xp)l=r;
+  return l;
+};
 
 const getAnimalData=(state)=>{
   const preset=ZODIAC_ANIMALS.find(a=>a.id===state?.animal);
@@ -211,7 +233,7 @@ const getAuraStreak=(s)=>{
   if(done.length>=(s.selectedHabits?.length||1)&&s.selectedHabits?.length>0)streak++;
   else{if(i===0)continue;break;}}return streak;
 };
-const getLevel=(s)=>{const st=s.auraStreak||0;let l=LEVEL_REQUIREMENTS[0];for(const r of LEVEL_REQUIREMENTS)if(st>=r.auraDays)l=r;return l;};
+
 const getHP=(s)=>{
   const d=s.completionLog?.[getToday()]||[];const goals=s.selectedHabits?.length||1;
   return Math.min(100,Math.round((d.length/goals)*100));
@@ -9939,6 +9961,9 @@ function SpiritAnimals(){
   const level=appState?getLevel(appState):LEVEL_REQUIREMENTS[0];
   const _realStreak=appState?.auraStreak||0;const streak=devStreak!==null?devStreak:_realStreak;const days=appState?.startDate?getDaysBetween(appState.startDate,getToday())+1:0;
   const allDoneToday=appState?getAllDone(appState):false;const nextLv=LEVEL_REQUIREMENTS.find(l=>l.level===level.level+1);
+  const xp=appState?calcXP(appState):0;
+  // Save high-water XP mark
+  React.useEffect(()=>{if(appState&&xp>(appState.highXP||0)){const d={...appState,highXP:xp};localStorage.setItem("zodibuddies_v1",JSON.stringify(d));}},[xp]);
   const hp=appState?getHP(appState):100;const canEditHabits=true;
   const animalData=appState?getAnimalData(appState):{color:"#8b5cf6",accent:"#a78bfa"};
   const hinted=getHintedEffects(customHabitName);
@@ -10452,8 +10477,8 @@ function SpiritAnimals(){
 
               {/* Level progress */}
               {nextLv&&<div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,opacity:.3,marginBottom:2}}><span>Next: {nextLv.name}</span><span>{streak}/{nextLv.auraDays}d</span></div>
-                <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.05)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:"linear-gradient(90deg,#667eea,#f093fb)",width:`${Math.min(100,(streak/nextLv.auraDays)*100)}%`,transition:"width .5s"}}/></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,opacity:.3,marginBottom:2}}><span>Next: {nextLv.name}</span><span>{xp}/{nextLv.xp} XP</span></div>
+                <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.05)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:"linear-gradient(90deg,#667eea,#f093fb)",width:`${Math.min(100,((xp-level.xp)/Math.max(1,nextLv.xp-level.xp))*100)}%`,transition:"width .5s"}}/></div>
               </div>}
             </div>
           </div>
