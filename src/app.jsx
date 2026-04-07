@@ -7382,8 +7382,8 @@ const NotebookPanel=()=>{
       </div>}
       {/* Image display with square grid overlay and draw canvas */}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:12}}>
-        {hasVecContent?<div style={{position:"relative",transform:`scale(${pageZoom})`,transformOrigin:"top left",display:"inline-block",marginBottom:pageZoom>1?`${(pageZoom-1)*100}%`:0,marginRight:pageZoom>1?`${(pageZoom-1)*100}%`:0}}>
-          <img ref={(el)=>{if(el)el._vecImg=true;}} src={vecPng} style={{maxWidth:"100%",height:"auto",display:"block",imageRendering:"auto"}} onLoad={(e)=>{
+        {hasVecContent?<div style={{display:"inline-block",minWidth:"100%"}}><div style={{position:"relative",transform:`scale(${pageZoom})`,transformOrigin:"top left",display:"inline-block"}}>
+          <img ref={(el)=>{if(el)el._vecImg=true;}} src={vecPng} style={{display:"block",imageRendering:"auto"}} onLoad={(e)=>{
             // Store natural dimensions for square grid calc
             const img=e.target;img.dataset.natW=img.naturalWidth;img.dataset.natH=img.naturalHeight;
           }}/>
@@ -7499,7 +7499,7 @@ const NotebookPanel=()=>{
           }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>}
           {/* Show saved draw overlay when not in draw mode */}
           {!vecDrawMode&&page.vecDrawData&&<img src={page.vecDrawData} style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}/>}
-        </div>
+        </div></div>
         :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
           <div style={{fontSize:48,marginBottom:12}}>✏️</div>
           <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert</div>
