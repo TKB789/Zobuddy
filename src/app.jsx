@@ -7346,7 +7346,7 @@ const NotebookPanel=()=>{
       {/* Draw toolbar — uses DMC palette from conversion */}
       {vecDrawMode&&hasVecContent&&<div style={{display:"flex",flexDirection:"column",gap:3,padding:"2px 10px 4px",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-          <button onClick={()=>{saveVecDraw();setVecDrawMode(false);setVecEyedropper(false);}} style={btn({background:"rgba(102,126,234,.15)",border:"1px solid rgba(102,126,234,.3)",color:"#a8b4f0",padding:"3px 8px",fontSize:10})}>Done</button>
+          <button onClick={()=>{saveVecDraw();vecDrawCanvasRef.current=null;setVecDrawMode(false);setVecEyedropper(false);}} style={btn({background:"rgba(102,126,234,.15)",border:"1px solid rgba(102,126,234,.3)",color:"#a8b4f0",padding:"3px 8px",fontSize:10})}>Done</button>
           <button onClick={vecUndoDraw} style={btn({color:"#aaa",padding:"3px 8px",fontSize:10})}>↩</button>
           <button onClick={vecRedoDraw} style={btn({color:"#aaa",padding:"3px 8px",fontSize:10})}>↪</button>
           <button onClick={()=>{setVecDrawEraser(false);setVecEyedropper(e=>!e);}} style={btn(vecEyedropper?{background:"rgba(67,233,123,.2)",border:"1px solid rgba(67,233,123,.4)",color:"#43e97b",padding:"3px 8px",fontSize:10}:{padding:"3px 8px",fontSize:10,color:"#888"})}>💧</button>
@@ -7402,12 +7402,11 @@ const NotebookPanel=()=>{
             if(dd){const img2=new Image();img2.onload=()=>{el.getContext("2d").drawImage(img2,0,0);vecPushHistory();};img2.src=dd;}else{vecPushHistory();}
             const getXY=(e)=>{const r=el.getBoundingClientRect();return{x:(e.clientX-r.left)*el.width/r.width,y:(e.clientY-r.top)*el.height/r.height};};
             let pinching=false;let lastPinchDist=0;let lastPinchMidX=0;let lastPinchMidY=0;
-            let pendingDown=null;let startPos=null;
+            let strokeStartedAt=0;
             const scrollParent=()=>{let p=el.parentElement;while(p){if(p.scrollHeight>p.clientHeight||p.scrollWidth>p.clientWidth)return p;p=p.parentElement;}return null;};
             el.addEventListener("touchstart",(e)=>{
               if(e.touches.length>=2){
-                // Cancel any pending draw start
-                if(pendingDown){clearTimeout(pendingDown);pendingDown=null;}
+                if(vecIsDrawing.current&&Date.now()-strokeStartedAt<200){vecUndoDraw();}
                 vecIsDrawing.current=false;pinching=true;
                 const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
                 lastPinchDist=Math.sqrt(dx*dx+dy*dy);
@@ -7415,7 +7414,7 @@ const NotebookPanel=()=>{
                 lastPinchMidY=(e.touches[0].clientY+e.touches[1].clientY)/2;
                 e.preventDefault();return;}
               if(e.touches.length===1&&!pinching){
-                e.preventDefault();const p=getXY(e.touches[0]);startPos=p;
+                e.preventDefault();const p=getXY(e.touches[0]);
                 if(vecEyedropperRef.current){
                   const baseImg=el.parentElement?.querySelector("img");if(baseImg){
                     const tc2=document.createElement("canvas");tc2.width=baseImg.naturalWidth||800;tc2.height=baseImg.naturalHeight||800;
@@ -7424,63 +7423,34 @@ const NotebookPanel=()=>{
                     const px=tc2.getContext("2d").getImageData(ix,iy,1,1).data;
                     setVecDrawColor("#"+[px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,"0")).join(""));setVecEyedropper(false);
                   }return;}
-                // Delay draw start to allow second finger for pinch/pan
-                pendingDown=setTimeout(()=>{
-                  pendingDown=null;
-                  vecIsDrawing.current=true;const ctx=el.getContext("2d");
-                  const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
-                  if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
-                  else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
-                  ctx.lineCap="round";ctx.lineJoin="round";
-                  ctx.beginPath();ctx.arc(startPos.x,startPos.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(startPos.x,startPos.y);
-                },120);
+                vecPushHistory();strokeStartedAt=Date.now();
+                vecIsDrawing.current=true;const ctx=el.getContext("2d");
+                const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
+                if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
+                else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
+                ctx.lineCap="round";ctx.lineJoin="round";
+                ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);
               }
             },{passive:false});
             el.addEventListener("touchmove",(e)=>{
               if(e.touches.length>=2){
-                if(pendingDown){clearTimeout(pendingDown);pendingDown=null;}
+                if(vecIsDrawing.current&&Date.now()-strokeStartedAt<200){vecUndoDraw();}
                 vecIsDrawing.current=false;pinching=true;
                 e.preventDefault();
                 const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
                 const dist=Math.sqrt(dx*dx+dy*dy);
                 const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
                 const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
-                // Pinch zoom
                 if(lastPinchDist>0){const scale=dist/lastPinchDist;setPageZoom(z=>Math.max(0.3,Math.min(6,z*scale)));}
-                // Two-finger pan
                 const sp=scrollParent();
                 if(sp){sp.scrollLeft-=(midX-lastPinchMidX);sp.scrollTop-=(midY-lastPinchMidY);}
                 lastPinchDist=dist;lastPinchMidX=midX;lastPinchMidY=midY;return;}
-              // Flush pending draw on first move (single finger drag)
-              if(pendingDown&&e.touches.length===1){
-                clearTimeout(pendingDown);pendingDown=null;
-                vecIsDrawing.current=true;const ctx=el.getContext("2d");vecPushHistory();
-                const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
-                if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
-                else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
-                ctx.lineCap="round";ctx.lineJoin="round";
-                if(startPos){ctx.beginPath();ctx.moveTo(startPos.x,startPos.y);}
-              }
               if(!vecIsDrawing.current||pinching)return;e.preventDefault();
               const p=getXY(e.touches[0]);const ctx=el.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke();
             },{passive:false});
             el.addEventListener("touchend",(e)=>{
               if(e.touches.length<2){pinching=false;lastPinchDist=0;}
-              // Flush pending dot for single tap
-              if(pendingDown&&e.touches.length===0){
-                clearTimeout(pendingDown);pendingDown=null;
-                if(startPos){
-                  const ctx=el.getContext("2d");vecPushHistory();
-                  const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
-                  if(erasing){ctx.globalCompositeOperation="destination-out";}
-                  else{ctx.globalCompositeOperation="source-over";ctx.fillStyle=col;}
-                  ctx.beginPath();ctx.arc(startPos.x,startPos.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fill();
-                  ctx.globalCompositeOperation="source-over";
-                  vecPushHistory();saveVecDraw();
-                }
-              }
               if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveVecDraw();}
-              startPos=null;
             });
           }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>}
           {/* Show saved draw overlay when not in draw mode */}
