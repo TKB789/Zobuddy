@@ -6158,6 +6158,8 @@ const NotebookPanel=()=>{
   const vecPendingLimit=React.useRef(0);
   const[vecDrawMode,setVecDrawMode]=useState(false);
   const[vecGrid,setVecGrid]=useState(0); // 0=off, 5,10,20 = grid divisions
+  const[vecImgW,setVecImgW]=useState(800);
+  const[vecImgH,setVecImgH]=useState(800);
   const vecDrawCanvasRef=React.useRef(null);
   const vecDrawDataRef=React.useRef(null);
   const vecIsDrawing=React.useRef(false);
@@ -7264,7 +7266,6 @@ const NotebookPanel=()=>{
       {/* Row 3: draw + actions */}
       <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
         {hasVecContent&&!vecDrawMode&&<button onClick={()=>setVecDrawMode(true)} style={btn({padding:"3px 8px",fontSize:10,color:"#888"})}>🎨 Draw</button>}
-        {vecColors.length>0&&<button onClick={()=>{setVecShowPicker(v=>!v);setVecPaletteSearch("");}} style={btn({padding:"3px 7px",fontSize:10,color:vecShowPicker?"#feca57":"#888"})}>{vecShowPicker?"▼ Threads":"🧵 Threads"}</button>}
         <div style={{flex:1}}/>
         {hasVecContent&&<button onClick={()=>{
           const d=readNb();const pg=d.pages?.[pageIdxRef.current];if(!pg)return;
@@ -7299,20 +7300,6 @@ const NotebookPanel=()=>{
         <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗑️</button>
       </div>
       {/* Thread list — hidden until expanded */}
-      {vecShowPicker&&<div style={{padding:"4px 10px 6px",flexShrink:0}}>
-        {vecColors.length>0&&<div>
-          <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 Thread List ({vecColors.length} colors)</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:3,maxHeight:100,overflowY:"auto"}}>
-            {vecColors.map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.04)",borderRadius:5,padding:"2px 6px"}}>
-              <div style={{width:12,height:12,borderRadius:2,background:c.color,border:"1px solid rgba(255,255,255,.15)",flexShrink:0}}/>
-              <span style={{fontSize:9,color:"#feca57",fontWeight:700}}>#{i+1}</span>
-              <span style={{fontSize:9,color:"#e8e0f0",fontWeight:700}}>DMC {c.dmc?.n||"?"}</span>
-              <span style={{fontSize:9,color:"rgba(232,224,240,.4)"}}>{c.dmc?.nm||""}</span>
-              <span style={{fontSize:8,color:"rgba(232,224,240,.3)"}}>({c.count}px)</span>
-            </div>)}
-          </div>
-        </div>}
-      </div>}
       {/* Crop UI */}
       {vecCropImg&&<div style={{position:"absolute",inset:0,zIndex:100,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",overflow:"auto"}}>
         <div style={{padding:"12px 16px",flexShrink:0}}>
@@ -7382,15 +7369,14 @@ const NotebookPanel=()=>{
       </div>}
       {/* Image display with square grid overlay and draw canvas */}
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:12}}>
-        {hasVecContent?<div style={{display:"inline-block",minWidth:"100%"}}><div style={{position:"relative",transform:`scale(${pageZoom})`,transformOrigin:"top left",display:"inline-block"}}>
-          <img ref={(el)=>{if(el)el._vecImg=true;}} src={vecPng} style={{display:"block",imageRendering:"auto"}} onLoad={(e)=>{
-            // Store natural dimensions for square grid calc
+        {hasVecContent?<div style={{position:"relative",display:"inline-block"}}>
+          <img ref={(el)=>{if(el)el._vecImg=true;}} src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
             const img=e.target;img.dataset.natW=img.naturalWidth;img.dataset.natH=img.naturalHeight;
+            setVecImgW(img.naturalWidth);setVecImgH(img.naturalHeight);
           }}/>
           {/* Square grid overlay — true squares based on shorter dimension, dotted lines for partial edge cells */}
           {vecGrid>0&&(()=>{
-            const imgEl=document.querySelector("img[data-nat-w]");
-            const natW=Number(imgEl?.dataset?.natW||800),natH=Number(imgEl?.dataset?.natH||800);
+            const natW=vecImgW,natH=vecImgH;
             const cellSize=Math.min(natW,natH)/vecGrid;
             const cols=Math.floor(natW/cellSize),rows=Math.floor(natH/cellSize);
             const remX=natW-cols*cellSize,remY=natH-rows*cellSize;
@@ -7499,7 +7485,7 @@ const NotebookPanel=()=>{
           }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>}
           {/* Show saved draw overlay when not in draw mode */}
           {!vecDrawMode&&page.vecDrawData&&<img src={page.vecDrawData} style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}/>}
-        </div></div>
+        </div>
         :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
           <div style={{fontSize:48,marginBottom:12}}>✏️</div>
           <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert</div>
