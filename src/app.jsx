@@ -6162,7 +6162,6 @@ const NotebookPanel=()=>{
   const[vecImgH,setVecImgH]=useState(800);
   const[vecOrigOpacity,setVecOrigOpacity]=useState(0); // 0 = hidden, 0.1-1 = visible
   const[vecPalExpanded,setVecPalExpanded]=useState(false);
-  const[vecFullPalette,setVecFullPalette]=useState(false);
   const vecDrawCanvasRef=React.useRef(null);
   const vecDrawDataRef=React.useRef(null);
   const vecIsDrawing=React.useRef(false);
@@ -7352,20 +7351,8 @@ const NotebookPanel=()=>{
             style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:700,border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.05)",color:"#888",cursor:"pointer"}}>+{sortedColors.length-8}</button>}
           {vecPalExpanded&&sortedColors.length>8&&<button onClick={()=>setVecPalExpanded(false)}
             style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:700,border:"1px solid rgba(254,202,87,.3)",background:"rgba(254,202,87,.1)",color:"#feca57",cursor:"pointer"}}>▲</button>}
-          <button onClick={()=>setVecFullPalette(v=>!v)}
-            style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:700,border:vecFullPalette?"1px solid rgba(240,147,251,.3)":"1px solid rgba(255,255,255,.1)",background:vecFullPalette?"rgba(240,147,251,.1)":"rgba(255,255,255,.05)",color:vecFullPalette?"#f093fb":"#888",cursor:"pointer"}}>{vecFullPalette?"▲ 400+":"🎨 400+"}</button>
         </div>
-        {vecFullPalette&&<div style={{marginTop:4}}>
-          <input value={vecPaletteSearch} onChange={e=>setVecPaletteSearch(e.target.value)} placeholder="Search DMC # or name..." style={{width:"100%",padding:"4px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#e8e0f0",fontSize:11,outline:"none",marginBottom:4,boxSizing:"border-box"}}/>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(14,1fr)",gap:2,maxHeight:120,overflowY:"auto",overflowX:"hidden"}}>
-            {(vecPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=vecPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>{
-              const lum=parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114;
-              return <div key={p.n+p.c} onClick={()=>{setVecDrawColor(p.c);setVecDrawEraser(false);setVecEyedropper(false);}} title={`DMC ${p.n} — ${p.nm}`}
-                style={{aspectRatio:"1",borderRadius:3,background:p.c,border:vecDrawColor===p.c&&!vecDrawEraser?"2px solid #feca57":lum<80?"1px solid rgba(255,255,255,.3)":"1px solid rgba(0,0,0,.15)",cursor:"pointer",minWidth:0}}/>;
-            })}
-          </div>
-        </div>}
-        {vecColors.length===0&&!vecFullPalette&&<div style={{display:"flex",gap:2,marginTop:3}}>
+        {vecColors.length===0&&<div style={{display:"flex",gap:2,marginTop:3}}>
           {["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
             style={cSwatch(c,vecDrawColor===c&&!vecDrawEraser)}/>)}
         </div>}
@@ -7391,8 +7378,8 @@ const NotebookPanel=()=>{
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:12}}>
         {hasVecContent?<div style={{position:"relative",display:"inline-block"}}>
           <img ref={(el)=>{if(el)el._vecImg=true;}} src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
-            const img=e.target;img.dataset.natW=img.naturalWidth;img.dataset.natH=img.naturalHeight;
-            setVecImgW(img.naturalWidth);setVecImgH(img.naturalHeight);
+            const img=e.target;const nw=img.naturalWidth,nh=img.naturalHeight;
+            if(nw&&nh&&(nw!==vecImgW||nh!==vecImgH)){setVecImgW(nw);setVecImgH(nh);}
           }}/>
           {/* Original photo overlay */}
           {page.vectorOriginal&&vecOrigOpacity>0&&<img src={page.vectorOriginal} style={{position:"absolute",inset:0,width:"100%",height:"100%",opacity:vecOrigOpacity,pointerEvents:"none",mixBlendMode:"normal"}}/>}
