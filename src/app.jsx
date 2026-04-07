@@ -10590,10 +10590,10 @@ function SpiritAnimals(){
               </div>}
 
               {/* Buddy display */}
-              <div style={{margin:"4px -4px 4px",borderRadius:12,background:`linear-gradient(180deg,${animalData.color}12 0%,${animalData.accent}08 50%,transparent 100%)`,border:`1px solid ${animalData.accent}18`,padding:"2px 0",display:"flex",alignItems:"center",justifyContent:"center",minHeight:110,position:"relative"}}>
+              <div style={{margin:"4px -4px 4px",borderRadius:12,background:`linear-gradient(180deg,${animalData.color}12 0%,${animalData.accent}08 50%,transparent 100%)`,border:`1px solid ${animalData.accent}18`,padding:"2px 0",display:"flex",alignItems:"center",justifyContent:"center",minHeight:120,position:"relative"}}>
                 <div style={{position:"relative"}}>
                   {negCount>0&&!allDoneToday&&<div style={{textAlign:"center",position:"absolute",top:-2,left:"50%",transform:"translateX(-50%)",zIndex:3,whiteSpace:"nowrap"}}><span style={{fontSize:11,color:"#f5576c",opacity:.7}}>⚠️ {negCount} effect{negCount>1?"s":""} active</span></div>}
-                  <BuddyDisplay animal={appState?.animal} state={{...(appState||{}),_roaming:isRoaming&&!fullBack,auraStreak:streak}} size={105}/>
+                  <BuddyDisplay animal={appState?.animal} state={{...(appState||{}),_roaming:isRoaming&&!fullBack,auraStreak:streak}} size={130}/>
                 </div>
                 {allDoneToday&&<div style={{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",zIndex:3}}>
                   <span style={{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:800,color:"#43e97b",boxShadow:"0 0 12px rgba(67,233,123,.3)",whiteSpace:"nowrap"}}>✅ All Goals Completed</span>
