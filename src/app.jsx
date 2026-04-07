@@ -6941,7 +6941,6 @@ const NotebookPanel=()=>{
 
   // ═══ PIXEL PAGE ═══
   if(nbView==="page"&&nbData.pages[nbPageIdx]?.type==="pixel"){
-   try{
     const page=nbData.pages[nbPageIdx];const dims=getPixelDims();const cs=getPixelCellSize();
     const cW=dims.c*cs,cH=dims.r*cs,hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
     return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -7095,12 +7094,6 @@ const NotebookPanel=()=>{
         <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
           <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"none",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
         </div></div></div>);
-   }catch(err){console.error("Pixel art error:",err);return(<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{fontSize:36,marginBottom:8}}>⚠️</div>
-      <div style={{fontSize:14,fontWeight:700,color:"#f5576c",marginBottom:8}}>Pixel Art Error</div>
-      <div style={{fontSize:12,opacity:.5,marginBottom:12,textAlign:"center",maxWidth:280}}>{String(err)}</div>
-      <button onClick={()=>setNbView("toc")} style={btn({background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",padding:"10px 24px"})}>← Back to Notes</button>
-    </div>);}
   }
 
   // ═══ VECTOR ART ENGINE ═══
