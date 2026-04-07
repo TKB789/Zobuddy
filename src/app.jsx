@@ -10409,7 +10409,7 @@ function SpiritAnimals(){
         {/* Search */}
         <div style={{marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:700,opacity:.3,marginBottom:4}}>💾 STORAGE</div>
-          {(()=>{const used=getStorageUsage();const max=50*1024*1024;const pct=Math.min(100,Math.round(used/max*100));const mb=(used/1024/1024).toFixed(1);
+          {(()=>{const used=ZobuddyDB.getUsage();const max=50*1024*1024;const pct=Math.min(100,Math.round(used/max*100));const mb=(used/1024/1024).toFixed(1);
             return(<div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
                 <span style={{color:"#e8e0f0",opacity:.6}}>{mb} MB / 50 MB</span>
