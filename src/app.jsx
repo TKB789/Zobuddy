@@ -6163,6 +6163,7 @@ const NotebookPanel=()=>{
   const[vecImgH,setVecImgH]=useState(800);
   const[vecOrigOpacity,setVecOrigOpacity]=useState(0); // 0 = hidden, 0.1-1 = visible
   const[vecPalExpanded,setVecPalExpanded]=useState(false);
+  const vecSvgRef=React.useRef("");
   const vecDrawCanvasRef=React.useRef(null);
   const vecDrawDataRef=React.useRef(null);
   const vecIsDrawing=React.useRef(false);
@@ -6186,6 +6187,7 @@ const NotebookPanel=()=>{
   const[polyImporting,setPolyImporting]=useState(false);
   const polyFileRef=React.useRef(null);
   const[polyDensity,setPolyDensity]=useState(300);
+  const[vecDensity,setVecDensity]=useState("med"); // "low"|"med"|"high"|"ultra" for flat art smoothness
   const[polyCropImg,setPolyCropImg]=useState(null);
   const[polyCropBox,setPolyCropBox]=useState({x:0,y:0,w:100,h:100});
   const polyPendingColors=React.useRef(0);
@@ -6943,7 +6945,7 @@ const NotebookPanel=()=>{
   // ═══ PIXEL PAGE ═══
   // ═══ VECTOR ART ENGINE ═══
   // ═══ VECTOR ART ENGINE — paint-by-number posterizer ═══
-  const traceImageToSvg=(imgSrc,colorCount,callback)=>{
+  const traceImageToSvg=(imgSrc,colorCount,density,callback)=>{
     const img=new Image();
     img.onerror=()=>{alert("Failed to load image");callback(null);};
     img.onload=()=>{
@@ -6954,7 +6956,9 @@ const NotebookPanel=()=>{
       // Step 1: Blur to smooth out noise
       const tc=document.createElement("canvas");tc.width=w;tc.height=h;
       const tctx=tc.getContext("2d");
-      tctx.filter="blur(2px)";tctx.drawImage(img,0,0,w,h);tctx.filter="none";
+      const blurPx=density==="low"?4:density==="high"?1:density==="ultra"?0:2;
+      if(blurPx>0){tctx.filter=`blur(${blurPx}px)`;tctx.drawImage(img,0,0,w,h);tctx.filter="none";}
+      else{tctx.drawImage(img,0,0,w,h);}
       const data=tctx.getImageData(0,0,w,h).data;
       const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
       const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
@@ -6977,11 +6981,13 @@ const NotebookPanel=()=>{
       for(let i=0;i<grid.length;i++){if(grid[i]!==65535)grid[i]=remap[grid[i]];}
       // Step 3: Mode filter (5 passes for very clean regions)
       const clean=new Uint16Array(w*h);
-      for(let pass=0;pass<5;pass++){
+      const numPasses=density==="low"?8:density==="high"?2:density==="ultra"?1:5;
+      const kernelR=density==="ultra"?1:2;
+      for(let pass=0;pass<numPasses;pass++){
         const src=pass===0?grid:clean;
         for(let y=0;y<h;y++)for(let x=0;x<w;x++){
           const counts=new Map();
-          for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+          for(let dy=-kernelR;dy<=kernelR;dy++)for(let dx=-kernelR;dx<=kernelR;dx++){
             const ny=y+dy,nx=x+dx;
             if(ny>=0&&ny<h&&nx>=0&&nx<w){const v=src[ny*w+nx];if(v!==65535)counts.set(v,(counts.get(v)||0)+1);}
           }
@@ -6989,7 +6995,7 @@ const NotebookPanel=()=>{
           counts.forEach((c,v)=>{if(c>bestC){bestC=c;best=v;}});
           clean[y*w+x]=best;
         }
-        if(pass<4)for(let i=0;i<w*h;i++)grid[i]=clean[i];
+        if(pass<numPasses-1)for(let i=0;i<w*h;i++)grid[i]=clean[i];
       }
       // Step 4: Render to canvas as a clean image
       const outCanvas=document.createElement("canvas");outCanvas.width=w;outCanvas.height=h;
@@ -7031,7 +7037,6 @@ const NotebookPanel=()=>{
       }catch(err){alert("Error: "+err.message);callback(null);}
     };img.src=imgSrc;
   };
-  const vecSvgRef=React.useRef("");
   const vecConvert=(paletteLimit)=>{
     vecPendingLimit.current=paletteLimit;
     vecFileRef.current?.click();
@@ -7051,7 +7056,7 @@ const NotebookPanel=()=>{
       const bw=Math.max(1,Math.round(ci2.width*vecCropBox.w/100)),bh=Math.max(1,Math.round(ci2.height*vecCropBox.h/100));
       const cc=document.createElement("canvas");cc.width=bw;cc.height=bh;
       cc.getContext("2d").drawImage(ci2,bx,by,bw,bh,0,0,bw,bh);
-      traceImageToSvg(cc.toDataURL("image/png"),vecPendingLimit.current,(result)=>{
+      traceImageToSvg(cc.toDataURL("image/png"),vecPendingLimit.current,vecDensity,(result)=>{
         setVecImporting(false);if(!result)return;
         vecSvgRef.current=result.svg;
         const d=readNb();const pi=pageIdxRef.current;
@@ -7316,11 +7321,13 @@ const NotebookPanel=()=>{
           <button onClick={()=>doConvert(0)} disabled={isConverting}
             style={tbtn({background:"rgba(240,147,251,.1)",border:"1px solid rgba(240,147,251,.2)",color:"#f093fb",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷All"}</button>
         </>}
-        {artStyle==="poly"&&<>
+        {(artStyle==="poly"||artStyle==="vector")&&<>
           <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
-          <span style={{fontSize:9,opacity:.4}}>Density:</span>
-          {[{v:100,l:"Low"},{v:300,l:"Med"},{v:600,l:"High"},{v:1200,l:"Ultra"}].map(d=>(
+          <span style={{fontSize:9,opacity:.4}}>Detail:</span>
+          {artStyle==="poly"&&[{v:100,l:"Low"},{v:300,l:"Med"},{v:600,l:"High"},{v:1200,l:"Ultra"}].map(d=>(
             <button key={d.v} onClick={()=>setPolyDensity(d.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:9,fontWeight:700,border:polyDensity===d.v?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:polyDensity===d.v?"rgba(102,126,234,.15)":"transparent",color:polyDensity===d.v?"#a8b4f0":"#666",cursor:"pointer"}}>{d.l}</button>))}
+          {artStyle==="vector"&&[{v:"low",l:"Smooth"},{v:"med",l:"Med"},{v:"high",l:"Detailed"},{v:"ultra",l:"Sharp"}].map(d=>(
+            <button key={d.v} onClick={()=>setVecDensity(d.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:9,fontWeight:700,border:vecDensity===d.v?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:vecDensity===d.v?"rgba(102,126,234,.15)":"transparent",color:vecDensity===d.v?"#a8b4f0":"#666",cursor:"pointer"}}>{d.l}</button>))}
         </>}
       </div>
       {/* Original photo opacity slider (vector only) */}
@@ -7692,7 +7699,7 @@ const NotebookPanel=()=>{
       {/* Bottom row: zoom + actions */}
       <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px 8px",flexShrink:0}}>
         <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={tbtn({padding:"6px 10px"})}>−</button>
-        <span style={{fontSize:11,opacity:.4,minWidth:36,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
+        <button onClick={()=>{setPageZoom(1);}} style={{background:"none",border:"none",fontSize:11,color:pageZoom!==1?"#feca57":"rgba(255,255,255,.4)",fontWeight:pageZoom!==1?700:400,minWidth:36,textAlign:"center",cursor:"pointer",padding:"6px 4px"}}>{Math.round(pageZoom*100)}%</button>
         <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={tbtn({padding:"6px 10px"})}>+</button>
         <div style={{flex:1}}/>
         {artStyle==="pixel"&&<button onClick={()=>{if(!confirm("Clear all pixels?"))return;const d2=readNb();if(d2.pages?.[nbPageIdx]){d2.pages[nbPageIdx].pixels={};writeNb(d2);drawPixelGrid();}}}
