@@ -6125,6 +6125,7 @@ const NotebookPanel=()=>{
   const[nbPageIdx,setNbPageIdx]=useState(0);
   const[nbNewTitle,setNbNewTitle]=useState("");
   const[nbNewType,setNbNewType]=useState("lined");
+  const[nbNewArtStyle,setNbNewArtStyle]=useState("pixel");
   const[nbPixelSize,setNbPixelSize]=useState("32x32");
   const[nbSetPw,setNbSetPw]=useState("");
   const[nbSetPw2,setNbSetPw2]=useState("");
@@ -6940,137 +6941,130 @@ const NotebookPanel=()=>{
     </div>);
 
   // ═══ PIXEL PAGE ═══
-  if(nbView==="page"&&nbData.pages[nbPageIdx]?.type==="pixel"){
-    const page=nbData.pages[nbPageIdx];const dims=getPixelDims();const cs=getPixelCellSize();
-    const cW=dims.c*cs,cH=dims.r*cs,hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
-    return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <input ref={pixFileInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={(e)=>{const file=e.target.files?.[0];if(file&&pixImportCallbackRef.current)pixImportCallbackRef.current(file);e.target.value="";}}/>
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px 4px",flexShrink:0}}>
-        <button onClick={goToc} style={btn()}>←</button>
-        <button onClick={undoPixel} style={btn({color:"#aaa"})}>↩</button>
-        <button onClick={redoPixel} style={btn({color:"#aaa"})}>↪</button>
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
-            <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
-            {renaming?<input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
-              onBlur={()=>{if(renameVal.trim()){save("title",renameVal.trim());syncState();}setRenaming(false);}}
-              onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
-              style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:120}}/>
-            :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
-            <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
-          </div>
-      </div>
-      {/* Row 1: Color palette — primaries, complements, neutrals + expand */}
-      <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
-        <button onClick={()=>setPixelEraser(e=>!e)} style={btn(pixelEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",boxShadow:"0 0 8px rgba(245,87,108,.3)",padding:"4px 8px"}:{color:"#ccc",padding:"4px 8px"})}>
-          {pixelEraser?<span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span>:"✏️"}</button>
-        <div style={{width:1,height:20,background:"rgba(255,255,255,.1)"}}/>
-        {/* Primaries + complements + neutrals: Red,Blue,Yellow | Green,Orange,Purple | Black,Gray,White */}
-        {[
-          PIXEL_PALETTE.find(p=>p.n==="321"),  // Red
-          PIXEL_PALETTE.find(p=>p.n==="797"),  // Blue
-          PIXEL_PALETTE.find(p=>p.n==="973"),  // Yellow
-          PIXEL_PALETTE.find(p=>p.n==="699"),  // Green (complement of Red)
-          PIXEL_PALETTE.find(p=>p.n==="740"),  // Orange (complement of Blue)
-          PIXEL_PALETTE.find(p=>p.n==="550"),  // Purple (complement of Yellow)
-          PIXEL_PALETTE.find(p=>p.n==="310"),  // Black
-          PIXEL_PALETTE.find(p=>p.n==="414"),  // Gray
-          PIXEL_PALETTE.find(p=>p.n==="Blanc") // White
-        ].filter(Boolean).map(p=>(<div key={p.n} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} ${p.nm}`} style={{width:24,height:24,borderRadius:4,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.15)",cursor:"pointer",opacity:pixelEraser?.4:1}}/>))}
-        <button onClick={()=>{setShowPixPicker(v=>!v);setPixPaletteSearch("");}} style={btn({padding:"4px 8px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>{showPixPicker?"▼":"🎨"}</button>
-      </div>
-      {/* Full DMC color picker */}
-      {showPixPicker&&<div style={{padding:"4px 10px 6px",flexShrink:0}}>
-        <input value={pixPaletteSearch} onChange={e=>setPixPaletteSearch(e.target.value)} placeholder="Search DMC # or color name..." style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#e8e0f0",fontSize:11,outline:"none",marginBottom:4,boxSizing:"border-box"}}/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(12,1fr)",gap:2,maxHeight:180,overflowY:"auto",overflowX:"hidden"}}>
-          {(pixPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=pixPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>(<div key={p.n+p.c} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} — ${p.nm}`} style={{position:"relative",aspectRatio:"1",borderRadius:3,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":"1px solid rgba(255,255,255,.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minWidth:0}}>
-            <span style={{fontSize:6,fontWeight:700,color:(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)>128?"rgba(0,0,0,.5)":"rgba(255,255,255,.6)",lineHeight:1,textAlign:"center",overflow:"hidden"}}>{p.n}</span>
-          </div>))}
+  // ═══ UNIFIED ART EDITOR ═══
+  // Handles pixel, vector (flat), and poly art in one consistent layout
+  if(nbView==="page"&&(nbData.pages[nbPageIdx]?.type==="pixel"||nbData.pages[nbPageIdx]?.type==="vector"||nbData.pages[nbPageIdx]?.type==="poly")){
+    const page=nbData.pages[nbPageIdx];
+    const artStyle=page.type; // "pixel"|"vector"|"poly"
+    const hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
+    // Pixel art specifics
+    const dims=artStyle==="pixel"?getPixelDims():{c:32,r:32};
+    const cs=artStyle==="pixel"?getPixelCellSize():10;
+    const cW=dims.c*cs,cH=dims.r*cs;
+    // Vector/poly specifics
+    const vecSvg=artStyle==="vector"?(vecSvgRef.current||page.vectorSvg||""):"";
+    const vecPng=artStyle==="vector"?(page.vectorPng||""):"";
+    const vecColors=artStyle==="vector"?(page.vectorColors||[]):[];
+    const hasVecContent=artStyle==="vector"&&(vecSvg||vecPng);
+    const polyPng=artStyle==="poly"?(page.polyPng||""):"";
+    const polyColors=artStyle==="poly"?(page.polyColors||[]):[];
+    const hasArtContent=artStyle==="pixel"||hasVecContent||polyPng;
+    // Sort colors by hue for gradient display (shared by all types)
+    const artColors=artStyle==="vector"?vecColors:artStyle==="poly"?polyColors:[];
+    const sortedColors=(()=>{if(!artColors.length)return[];
+      return [...artColors].sort((a,b)=>{
+        const hue=(hex)=>{const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,bl=parseInt(hex.slice(5,7),16)/255;
+          const mx=Math.max(r,g,bl),mn=Math.min(r,g,bl),d=mx-mn;if(d===0)return 0;
+          let h=0;if(mx===r)h=((g-bl)/d)%6;else if(mx===g)h=(bl-r)/d+2;else h=(r-g)/d+4;
+          return(h*60+360)%360;};
+        const lum=(hex)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),bl=parseInt(hex.slice(5,7),16);return r*.299+g*.587+bl*.114;};
+        const ha=hue(a.color),hb=hue(b.color);if(Math.abs(ha-hb)>15)return ha-hb;return lum(a.color)-lum(b.color);
+      });})();
+    // Color swatch with contrast border for dark swatches
+    const cSwatch=(color,selected,size=28)=>{
+      const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
+      const borderC=selected?"#feca57":lum<80?"rgba(255,255,255,.35)":"rgba(0,0,0,.15)";
+      return{width:size,height:size,borderRadius:5,background:color,border:selected?`2px solid ${borderC}`:`1px solid ${borderC}`,cursor:"pointer",boxSizing:"border-box",flexShrink:0};
+    };
+    // Bigger button style for thumb targets
+    const tbtn=(extra)=>({background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 12px",fontSize:14,color:"#ccc",cursor:"pointer",fontWeight:700,minWidth:36,textAlign:"center",...extra});
+    // Print handler
+    const doArtPrint=()=>{
+      if(artStyle==="pixel"){printPixelArt();return;}
+      const d=readNb();const pg=d.pages?.[pageIdxRef.current];if(!pg)return;
+      const imgSrc=artStyle==="vector"?pg.vectorPng:pg.polyPng;
+      const vc=artStyle==="vector"?(pg.vectorColors||[]):(pg.polyColors||[]);
+      if(!imgSrc)return;
+      const legendHtml=vc.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-block"></span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""} <span style="color:#888">(${c.count}px)</span></span>`).join("");
+      const win=window.open("","_blank");
+      if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgSrc}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+    };
+    // Convert handler (shared concept)
+    const doConvert=(colorCount)=>{
+      if(artStyle==="pixel")importImage(colorCount);
+      else if(artStyle==="vector")vecConvert(colorCount);
+      else if(artStyle==="poly")polyConvert(colorCount);
+    };
+    // Save PNG handler
+    const doSavePng=()=>{
+      if(artStyle==="pixel"){const c=pixCanvasRef.current;if(c)saveAsPng(c.toDataURL("image/png"),page.title||"pixel-art");}
+      else if(artStyle==="vector"&&vecPng)saveAsPng(vecPng,page.title||"flat-art");
+      else if(artStyle==="poly"&&polyPng)saveAsPng(polyPng,page.title||"poly-art");
+    };
+    // Is currently importing
+    const isConverting=artStyle==="pixel"?pixImporting:artStyle==="vector"?vecImporting:polyImporting;
+
+    return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
+      {/* Hidden file inputs */}
+      {artStyle==="pixel"&&<input ref={pixFileInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={(e)=>{const file=e.target.files?.[0];if(file&&pixImportCallbackRef.current)pixImportCallbackRef.current(file);e.target.value="";}}/>}
+      {artStyle==="vector"&&<input ref={vecFileRef} type="file" accept="image/*" style={{display:"none"}}/>}
+      {artStyle==="poly"&&<input ref={polyFileRef} type="file" accept="image/*" style={{display:"none"}}/>}
+
+      {/* === TOP: Convert options === */}
+      <div style={{display:"flex",alignItems:"center",gap:4,padding:"8px 10px 2px",flexShrink:0}}>
+        <button onClick={goToc} style={tbtn({padding:"6px 10px",fontSize:13})}>←</button>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,minWidth:0}}>
+          <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
+          {renaming?<input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
+            onBlur={()=>{if(renameVal.trim()){save("title",renameVal.trim());syncState();}setRenaming(false);}}
+            onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
+            style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:100}}/>
+          :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:100}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
+          <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
-        <div style={{fontSize:10,marginTop:4,textAlign:"center",color:"rgba(232,224,240,.5)"}}>
-          <span style={{fontWeight:700}}>DMC {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.n||"—"}</span>
-          <span style={{opacity:.6}}> — {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.nm||"Custom"}</span>
-        </div>
-      </div>}
-      {/* Row 2: Tools — zoom, import, grid, numbers */}
-      <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
-        <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"3px 7px",fontSize:11})}>−</button>
-        <span style={{fontSize:10,opacity:.4,minWidth:28,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
-        <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={btn({padding:"3px 7px",fontSize:11})}>+</button>
-        <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
-        <button onClick={()=>importImage(8)} disabled={pixImporting}
-          style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{pixImporting?"...":"📷8"}</button>
-        <button onClick={()=>importImage(16)} disabled={pixImporting}
-          style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{pixImporting?"...":"📷16"}</button>
-        <button onClick={()=>importImage(32)} disabled={pixImporting}
-          style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{pixImporting?"...":"📷32"}</button>
-        <button onClick={()=>setShowMoreColors(v=>!v)} style={btn({fontSize:9,padding:"3px 6px",color:showMoreColors?"#feca57":"#888"})}>{showMoreColors?"▼":"▶"}More</button>
+        <span style={{fontSize:9,opacity:.35,fontWeight:700,padding:"2px 6px",borderRadius:6,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.06)"}}>{artStyle==="pixel"?"🟨 Pixel":artStyle==="vector"?"🎨 Flat":"🔷 Poly"}</span>
+      </div>
+      {/* Convert row */}
+      <div style={{display:"flex",alignItems:"center",gap:3,padding:"4px 10px 2px",flexShrink:0,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Convert:</span>
+        {[8,16,32].map(n=>(
+          <button key={n} onClick={()=>doConvert(n)} disabled={isConverting}
+            style={tbtn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷"+n}</button>))}
+        <button onClick={()=>setShowMoreColors(v=>!v)} style={tbtn({fontSize:10,padding:"5px 8px",color:showMoreColors?"#feca57":"#888"})}>{showMoreColors?"▼":"▶"}More</button>
         {showMoreColors&&<>
-          <input value={customColorCount} onChange={e=>setCustomColorCount(e.target.value.replace(/\D/g,""))} style={{width:36,padding:"2px 4px",borderRadius:4,border:"1px solid rgba(102,126,234,.3)",background:"rgba(102,126,234,.06)",color:"#a8b4f0",fontSize:10,fontWeight:700,textAlign:"center",outline:"none"}}/>
-          <button onClick={()=>{const n=Math.max(2,Math.min(438,Number(customColorCount)||32));importImage(n);}} disabled={pixImporting}
-            style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{pixImporting?"...":"📷Go"}</button>
-          <button onClick={()=>importImage(0)} disabled={pixImporting}
-            style={btn({background:"rgba(240,147,251,.1)",border:"1px solid rgba(240,147,251,.2)",color:"#f093fb",fontSize:9,padding:"3px 6px"})}>{pixImporting?"...":"📷All"}</button>
+          <input value={customColorCount} onChange={e=>setCustomColorCount(e.target.value.replace(/\D/g,""))} style={{width:36,padding:"3px 4px",borderRadius:6,border:"1px solid rgba(102,126,234,.3)",background:"rgba(102,126,234,.06)",color:"#a8b4f0",fontSize:11,fontWeight:700,textAlign:"center",outline:"none"}}/>
+          <button onClick={()=>{const n=Math.max(2,Math.min(438,Number(customColorCount)||32));doConvert(n);}} disabled={isConverting}
+            style={tbtn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷Go"}</button>
+          <button onClick={()=>doConvert(0)} disabled={isConverting}
+            style={tbtn({background:"rgba(240,147,251,.1)",border:"1px solid rgba(240,147,251,.2)",color:"#f093fb",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷All"}</button>
         </>}
-        <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
-        <button onClick={()=>{setShowPixNumbers(v=>{const nv=!v;setTimeout(drawPixelGrid,10);return nv;});}} style={btn(showPixNumbers?{background:"rgba(254,202,87,.12)",border:"1px solid rgba(254,202,87,.4)",color:"#feca57",fontSize:10,padding:"3px 7px"}:{fontSize:10,padding:"3px 7px",color:"#888"})}># Nums</button>
-        <span style={{fontSize:10,opacity:.3,fontWeight:700}}>Grid:</span>
-        {[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
-          <button key={g.v} onClick={()=>setPixelGridLines(g.v)} style={{padding:"2px 5px",borderRadius:6,fontSize:10,fontWeight:700,border:pixelGridLines===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:pixelGridLines===g.v?"rgba(254,202,87,.12)":"transparent",color:pixelGridLines===g.v?"#feca57":"#666",cursor:"pointer"}}>{g.l}</button>))}
+        {artStyle==="poly"&&<>
+          <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
+          <span style={{fontSize:9,opacity:.4}}>Density:</span>
+          {[{v:100,l:"Low"},{v:300,l:"Med"},{v:600,l:"High"},{v:1200,l:"Ultra"}].map(d=>(
+            <button key={d.v} onClick={()=>setPolyDensity(d.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:9,fontWeight:700,border:polyDensity===d.v?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:polyDensity===d.v?"rgba(102,126,234,.15)":"transparent",color:polyDensity===d.v?"#a8b4f0":"#666",cursor:"pointer"}}>{d.l}</button>))}
+        </>}
       </div>
-      {/* Row 3: Actions — all labeled */}
-      <div style={{display:"flex",alignItems:"center",gap:4,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
-        <button onClick={()=>{if(!confirm("Clear all pixels?"))return;const d=readNb();if(d.pages?.[nbPageIdx]){d.pages[nbPageIdx].pixels={};writeNb(d);drawPixelGrid();}}}
-          style={btn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:10,padding:"3px 8px"})}>🗑 Clear</button>
-        <div style={{flex:1}}/>
-        <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.12)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",fontSize:10,padding:"3px 8px"}:{fontSize:10,padding:"3px 8px",color:"#888"})}>💾 {saved?"Saved":"Save"}</button>
-        <button onClick={printPixelArt} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>
-        <button onClick={()=>{const c=pixCanvasRef.current;if(c)saveAsPng(c.toDataURL("image/png"),nbData.pages[nbPageIdx]?.title||"pixel-art");}} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 PNG</button>
-        <button onClick={archiveCurrentPage} style={btn({color:"#888",fontSize:10,padding:"3px 8px"})}>🗃 Archive</button>
-        <button onClick={deleteCurrentPage} style={btn({color:"#888",fontSize:10,padding:"3px 8px"})}>🗑 Delete</button>
-      </div>
-      {/* Thread list for pixel art — ranked by usage with pixel counts for thread purchasing */}
-      {showPixPicker&&(()=>{const pixels=getPixels();
-        const colorCounts={};Object.values(pixels).forEach(color=>{colorCounts[color]=(colorCounts[color]||0)+1;});
-        const ranked=Object.entries(colorCounts).sort((a,b)=>b[1]-a[1]);
-        return ranked.length>0?<div style={{padding:"2px 10px 6px",flexShrink:0}}>
-          <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 Thread List ({ranked.length} colors · {Object.keys(pixels).length} total pixels)</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:3,maxHeight:120,overflowY:"auto"}}>
-            {ranked.map(([color,count],i)=>{const p=PIXEL_PALETTE.find(p=>p.c===color);return <div key={color} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.04)",borderRadius:5,padding:"2px 6px"}}>
-              <div style={{width:14,height:14,borderRadius:2,background:color,border:"1px solid rgba(255,255,255,.15)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <span style={{fontSize:7,fontWeight:800,color:parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114>128?"#000":"#fff"}}>{i+1}</span>
-              </div>
-              <span style={{fontSize:9,color:"#feca57",fontWeight:700}}>#{i+1}</span>
-              {p&&<span style={{fontSize:9,color:"#e8e0f0",fontWeight:700}}>DMC {p.n}</span>}
-              {p&&<span style={{fontSize:9,color:"rgba(232,224,240,.4)"}}>{p.nm}</span>}
-              <span style={{fontSize:8,color:"rgba(232,224,240,.3)"}}>({count}px)</span>
-            </div>;})}
-          </div>
-        </div>:null;
-      })()}
-      {/* Image crop UI */}
-      {pixImgCrop&&(()=>{
-        const dims=getPixelDims();const gridRatio=dims.c/dims.r;
-        const imgRef=React.createRef();
-        const onDrag=(e)=>{
-          const touch=e.touches?e.touches[0]:e;
-          const img=e.currentTarget.querySelector("img")||e.currentTarget;
-          const rect=e.currentTarget.getBoundingClientRect();
-          const px=((touch.clientX-rect.left)/rect.width)*100;
-          const py=((touch.clientY-rect.top)/rect.height)*100;
-          // Size crop to maintain grid aspect ratio, 60% of image width
-          const cw=pixCropBox.w;const ch=Math.min(100,cw*(rect.width/rect.height)/gridRatio);
-          const cx=Math.max(0,Math.min(100-cw,px-cw/2));
-          const cy=Math.max(0,Math.min(100-ch,py-ch/2));
-          setPixCropBox({x:cx,y:cy,w:cw,h:ch});
-        };
+      {/* Original photo opacity slider (vector only) */}
+      {artStyle==="vector"&&page.vectorOriginal&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px",flexShrink:0}}>
+        <span style={{fontSize:10,opacity:.4}}>📷 Original:</span>
+        <input type="range" min="0" max="100" value={vecOrigOpacity*100} onChange={e=>setVecOrigOpacity(Number(e.target.value)/100)}
+          style={{flex:1,height:4,accentColor:"#60a5fa",opacity:.7,maxWidth:120}}/>
+        <span style={{fontSize:9,opacity:.3}}>{Math.round(vecOrigOpacity*100)}%</span>
+      </div>}
+
+      {/* === MIDDLE: Image/Canvas display === */}
+      {/* Crop UIs */}
+      {artStyle==="pixel"&&pixImgCrop&&(()=>{
+        const gridRatio=dims.c/dims.r;
         return <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.95)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{fontSize:16,fontWeight:800,color:"#e8e0f0",marginBottom:6}}>Drag to select area</div>
           <div style={{fontSize:11,color:"#888",marginBottom:8}}>Pinch or use slider to resize</div>
           <div style={{position:"relative",width:300,maxHeight:400,marginBottom:10,touchAction:"none"}}
-            onTouchMove={onDrag} onMouseMove={(e)=>{if(e.buttons===1)onDrag(e);}}>
+            onTouchMove={(e2)=>{const touch=e2.touches[0];const rect=e2.currentTarget.getBoundingClientRect();const px=((touch.clientX-rect.left)/rect.width)*100;const py=((touch.clientY-rect.top)/rect.height)*100;const cw2=pixCropBox.w;const ch2=Math.min(100,cw2*(rect.width/rect.height)/gridRatio);const cx2=Math.max(0,Math.min(100-cw2,px-cw2/2));const cy2=Math.max(0,Math.min(100-ch2,py-ch2/2));setPixCropBox({x:cx2,y:cy2,w:cw2,h:ch2});}}
+            onMouseMove={(e2)=>{if(e2.buttons===1){const rect=e2.currentTarget.getBoundingClientRect();const px=((e2.clientX-rect.left)/rect.width)*100;const py=((e2.clientY-rect.top)/rect.height)*100;const cw2=pixCropBox.w;const ch2=Math.min(100,cw2*(rect.width/rect.height)/gridRatio);const cx2=Math.max(0,Math.min(100-cw2,px-cw2/2));const cy2=Math.max(0,Math.min(100-ch2,py-ch2/2));setPixCropBox({x:cx2,y:cy2,w:cw2,h:ch2});}}}>
             <img src={pixImgCrop.src} style={{width:"100%",height:"auto",borderRadius:8,opacity:.4,display:"block",userSelect:"none",pointerEvents:"none"}}/>
             <div style={{position:"absolute",left:`${pixCropBox.x}%`,top:`${pixCropBox.y}%`,width:`${pixCropBox.w}%`,height:`${pixCropBox.h}%`,border:"2px solid #feca57",borderRadius:4,background:"rgba(254,202,87,.1)",pointerEvents:"none"}}/>
-            {/* Dark overlay outside crop */}
             <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
               <div style={{position:"absolute",top:0,left:0,right:0,height:`${pixCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
               <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-pixCropBox.y-pixCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
@@ -7080,7 +7074,7 @@ const NotebookPanel=()=>{
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,width:260}}>
             <span style={{fontSize:11,color:"#feca57",fontWeight:700,flexShrink:0}}>Size</span>
-            <input type="range" min="20" max="100" value={pixCropBox.w} onChange={(e)=>{const nw=Number(e.target.value);setPixCropBox(p=>{const nh=Math.min(100,nw*1/gridRatio);return{...p,w:nw,h:nh,x:Math.min(p.x,100-nw),y:Math.min(p.y,100-nh)};});}}
+            <input type="range" min="20" max="100" value={pixCropBox.w} onChange={(e2)=>{const nw2=Number(e2.target.value);setPixCropBox(p2=>{const nh2=Math.min(100,nw2*1/gridRatio);return{...p2,w:nw2,h:nh2,x:Math.min(p2.x,100-nw2),y:Math.min(p2.y,100-nh2)};});}}
               style={{flex:1,accentColor:"#feca57",filter:"contrast(1.3)"}}/>
             <span style={{fontSize:12,color:"#feca57",fontWeight:800,minWidth:36,textAlign:"right"}}>{Math.round(pixCropBox.w)}%</span>
           </div>
@@ -7090,12 +7084,297 @@ const NotebookPanel=()=>{
           </div>
         </div>;
       })()}
-      <div ref={el=>{if(el)pixScrollRef.current=el;}} style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
-        <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
-          <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"none",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
-        </div></div></div>);
-  }
+      {artStyle==="vector"&&vecCropImg&&<div style={{position:"absolute",inset:0,zIndex:100,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",overflow:"auto"}}>
+        <div style={{padding:"12px 16px",flexShrink:0}}>
+          <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0",marginBottom:2}}>Crop & Convert</div>
+          <div style={{fontSize:11,color:"#888"}}>Drag center to move · Drag corners to resize</div>
+        </div>
+        <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",padding:"0 16px"}}>
+          <div style={{position:"relative",width:"100%",maxWidth:300,touchAction:"none"}}
+            onPointerDown={(e)=>{const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
+              const b=vecCropBox;const corner=8;
+              if(Math.abs(px-b.x)<corner&&Math.abs(py-b.y)<corner)vecCropDrag.current={type:"tl",sx:px,sy:py,sb:{...b}};
+              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-b.y)<corner)vecCropDrag.current={type:"tr",sx:px,sy:py,sb:{...b}};
+              else if(Math.abs(px-b.x)<corner&&Math.abs(py-(b.y+b.h))<corner)vecCropDrag.current={type:"bl",sx:px,sy:py,sb:{...b}};
+              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-(b.y+b.h))<corner)vecCropDrag.current={type:"br",sx:px,sy:py,sb:{...b}};
+              else vecCropDrag.current={type:"move",sx:px,sy:py,sb:{...b}};
+              e.currentTarget.setPointerCapture(e.pointerId);}}
+            onPointerMove={(e)=>{if(!vecCropDrag.current)return;const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
+              const d2=vecCropDrag.current;const dx=px-d2.sx,dy=py-d2.sy;const s=d2.sb;
+              if(d2.type==="move")setVecCropBox({...s,x:Math.max(0,Math.min(100-s.w,s.x+dx)),y:Math.max(0,Math.min(100-s.h,s.y+dy))});
+              else if(d2.type==="br")setVecCropBox({...s,w:Math.max(10,Math.min(100-s.x,s.w+dx)),h:Math.max(10,Math.min(100-s.y,s.h+dy))});
+              else if(d2.type==="tl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h-dy);setVecCropBox({x:s.x+s.w-nw,y:s.y+s.h-nh,w:nw,h:nh});}
+              else if(d2.type==="tr"){const nw=Math.max(10,s.w+dx),nh=Math.max(10,s.h-dy);setVecCropBox({x:s.x,y:s.y+s.h-nh,w:Math.min(100-s.x,nw),h:nh});}
+              else if(d2.type==="bl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h+dy);setVecCropBox({x:s.x+s.w-nw,y:s.y,w:nw,h:Math.min(100-s.y,nh)});}}}
+            onPointerUp={()=>{vecCropDrag.current=null;}}>
+            <img src={vecCropImg} style={{width:"100%",height:"auto",borderRadius:6,display:"block",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:`${vecCropBox.x}%`,width:`${vecCropBox.w}%`,height:`${vecCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:3,pointerEvents:"none"}}/>
+            {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h])=>(
+              <div key={v+h} style={{position:"absolute",[v]:v==="top"?`${vecCropBox.y}%`:`${vecCropBox.y+vecCropBox.h}%`,[h]:h==="left"?`${vecCropBox.x}%`:`${vecCropBox.x+vecCropBox.w}%`,width:20,height:20,marginLeft:-10,marginTop:-10,borderRadius:10,background:"#feca57",border:"2px solid #000",pointerEvents:"none"}}/>))}
+            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:`${vecCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-vecCropBox.y-vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:0,width:`${vecCropBox.x}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",top:`${vecCropBox.y}%`,right:0,width:`${100-vecCropBox.x-vecCropBox.w}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+            </div>
+          </div>
+        </div>
+        <div style={{padding:"10px 16px",flexShrink:0,display:"flex",gap:8,justifyContent:"center"}}>
+          <button onClick={vecConfirmCrop} style={{padding:"10px 28px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:15,fontWeight:700,cursor:"pointer"}}>Convert</button>
+          <button onClick={()=>setVecCropImg(null)} style={{padding:"10px 28px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+        </div>
+      </div>}
+      {artStyle==="poly"&&polyCropImg&&<div style={{position:"absolute",inset:0,zIndex:100,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",overflow:"auto"}}>
+        <div style={{padding:"12px 16px",flexShrink:0}}>
+          <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0",marginBottom:2}}>Crop & Convert</div>
+          <div style={{fontSize:11,color:"#888"}}>Drag center to move · Drag corners to resize</div>
+        </div>
+        <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",padding:"0 16px"}}>
+          <div style={{position:"relative",width:"100%",maxWidth:300,touchAction:"none"}}
+            onPointerDown={(e)=>{const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
+              const b=polyCropBox;const corner=8;
+              if(Math.abs(px-b.x)<corner&&Math.abs(py-b.y)<corner)polyCropDrag.current={type:"tl",sx:px,sy:py,sb:{...b}};
+              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-b.y)<corner)polyCropDrag.current={type:"tr",sx:px,sy:py,sb:{...b}};
+              else if(Math.abs(px-b.x)<corner&&Math.abs(py-(b.y+b.h))<corner)polyCropDrag.current={type:"bl",sx:px,sy:py,sb:{...b}};
+              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-(b.y+b.h))<corner)polyCropDrag.current={type:"br",sx:px,sy:py,sb:{...b}};
+              else polyCropDrag.current={type:"move",sx:px,sy:py,sb:{...b}};
+              e.currentTarget.setPointerCapture(e.pointerId);}}
+            onPointerMove={(e)=>{if(!polyCropDrag.current)return;const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
+              const d2=polyCropDrag.current;const dx=px-d2.sx,dy=py-d2.sy;const s=d2.sb;
+              if(d2.type==="move")setPolyCropBox({...s,x:Math.max(0,Math.min(100-s.w,s.x+dx)),y:Math.max(0,Math.min(100-s.h,s.y+dy))});
+              else if(d2.type==="br")setPolyCropBox({...s,w:Math.max(10,Math.min(100-s.x,s.w+dx)),h:Math.max(10,Math.min(100-s.y,s.h+dy))});
+              else if(d2.type==="tl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h-dy);setPolyCropBox({x:s.x+s.w-nw,y:s.y+s.h-nh,w:nw,h:nh});}
+              else if(d2.type==="tr"){const nw=Math.max(10,s.w+dx),nh=Math.max(10,s.h-dy);setPolyCropBox({x:s.x,y:s.y+s.h-nh,w:Math.min(100-s.x,nw),h:nh});}
+              else if(d2.type==="bl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h+dy);setPolyCropBox({x:s.x+s.w-nw,y:s.y,w:nw,h:Math.min(100-s.y,nh)});}}}
+            onPointerUp={()=>{polyCropDrag.current=null;}}>
+            <img src={polyCropImg} style={{width:"100%",height:"auto",borderRadius:6,display:"block",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",top:`${polyCropBox.y}%`,left:`${polyCropBox.x}%`,width:`${polyCropBox.w}%`,height:`${polyCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:3,pointerEvents:"none"}}/>
+            {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h])=>(
+              <div key={v+h} style={{position:"absolute",[v]:v==="top"?`${polyCropBox.y}%`:`${polyCropBox.y+polyCropBox.h}%`,[h]:h==="left"?`${polyCropBox.x}%`:`${polyCropBox.x+polyCropBox.w}%`,width:20,height:20,marginLeft:-10,marginTop:-10,borderRadius:10,background:"#feca57",border:"2px solid #000",pointerEvents:"none"}}/>))}
+            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:`${polyCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-polyCropBox.y-polyCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",top:`${polyCropBox.y}%`,left:0,width:`${polyCropBox.x}%`,height:`${polyCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+              <div style={{position:"absolute",top:`${polyCropBox.y}%`,right:0,width:`${100-polyCropBox.x-polyCropBox.w}%`,height:`${polyCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
+            </div>
+          </div>
+        </div>
+        <div style={{padding:"10px 16px",flexShrink:0,display:"flex",gap:8,justifyContent:"center"}}>
+          <button onClick={polyConfirmCrop} style={{padding:"10px 28px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:15,fontWeight:700,cursor:"pointer"}}>Convert</button>
+          <button onClick={()=>setPolyCropImg(null)} style={{padding:"10px 28px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+        </div>
+      </div>}
 
+      {/* Main image area */}
+      <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",display:"flex",alignItems:artStyle==="pixel"?"flex-start":"center",justifyContent:"center",padding:artStyle==="pixel"?0:8}}>
+        {artStyle==="pixel"&&<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
+          <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"none",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
+        </div>}
+        {artStyle==="vector"&&(hasVecContent?<div style={{position:"relative",display:"inline-block"}}>
+          <img src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
+            const img2=e.target;const nw=img2.naturalWidth,nh=img2.naturalHeight;
+            if(nw&&nh&&(nw!==vecImgW||nh!==vecImgH)){setVecImgW(nw);setVecImgH(nh);}
+          }}/>
+          {page.vectorOriginal&&vecOrigOpacity>0&&<img src={page.vectorOriginal} style={{position:"absolute",inset:0,width:"100%",height:"100%",opacity:vecOrigOpacity,pointerEvents:"none",mixBlendMode:"normal"}}/>}
+          {/* Square grid overlay */}
+          {vecGrid>0&&(()=>{
+            const natW=vecImgW,natH=vecImgH;
+            const cellSize2=Math.min(natW,natH)/vecGrid;
+            const cols2=Math.floor(natW/cellSize2),rows2=Math.floor(natH/cellSize2);
+            const remX=natW-cols2*cellSize2,remY=natH-rows2*cellSize2;
+            return <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox={`0 0 ${natW} ${natH}`} preserveAspectRatio="none">
+              {Array.from({length:cols2-1},(_,i)=><line key={"v"+i} x1={cellSize2*(i+1)} y1="0" x2={cellSize2*(i+1)} y2={rows2*cellSize2} stroke="rgba(255,255,255,.4)" strokeWidth="1"/>)}
+              {Array.from({length:rows2-1},(_,i)=><line key={"h"+i} x1="0" y1={cellSize2*(i+1)} x2={cols2*cellSize2} y2={cellSize2*(i+1)} stroke="rgba(255,255,255,.4)" strokeWidth="1"/>)}
+              {remX>2&&<>
+                <line x1={cols2*cellSize2} y1="0" x2={cols2*cellSize2} y2={rows2*cellSize2} stroke="rgba(255,255,255,.5)" strokeWidth="1" strokeDasharray="4,3"/>
+                {Array.from({length:rows2-1},(_,i)=><line key={"he"+i} x1={cols2*cellSize2} y1={cellSize2*(i+1)} x2={natW} y2={cellSize2*(i+1)} stroke="rgba(255,255,255,.3)" strokeWidth="1" strokeDasharray="3,3"/>)}
+              </>}
+              {remY>2&&<>
+                <line x1="0" y1={rows2*cellSize2} x2={cols2*cellSize2} y2={rows2*cellSize2} stroke="rgba(255,255,255,.5)" strokeWidth="1" strokeDasharray="4,3"/>
+                {Array.from({length:cols2-1},(_,i)=><line key={"ve"+i} x1={cellSize2*(i+1)} y1={rows2*cellSize2} x2={cellSize2*(i+1)} y2={natH} stroke="rgba(255,255,255,.3)" strokeWidth="1" strokeDasharray="3,3"/>)}
+              </>}
+            </svg>;
+          })()}
+          {/* Draw overlay canvas */}
+          <canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
+            const d3=readNb();const dd=d3.pages?.[pageIdxRef.current]?.vecDrawData;
+            if(dd){const img3=new Image();img3.onload=()=>{el.getContext("2d").drawImage(img3,0,0);vecPushHistory();};img3.src=dd;}else{vecPushHistory();}
+            const getXY2=(e)=>{const r=el.getBoundingClientRect();return{x:(e.clientX-r.left)*el.width/r.width,y:(e.clientY-r.top)*el.height/r.height};};
+            let pinching2=false;let lastPinchDist2=0;let lastPinchMidX2=0;let lastPinchMidY2=0;
+            let strokeStartedAt2=0;
+            const scrollParent2=()=>{let p=el.parentElement;while(p){if(p.scrollHeight>p.clientHeight||p.scrollWidth>p.clientWidth)return p;p=p.parentElement;}return null;};
+            el.addEventListener("touchstart",(e)=>{
+              if(e.touches.length>=2){
+                if(vecIsDrawing.current&&Date.now()-strokeStartedAt2<200){vecUndoDraw();}
+                vecIsDrawing.current=false;pinching2=true;
+                const dx2=e.touches[0].clientX-e.touches[1].clientX,dy2=e.touches[0].clientY-e.touches[1].clientY;
+                lastPinchDist2=Math.sqrt(dx2*dx2+dy2*dy2);
+                lastPinchMidX2=(e.touches[0].clientX+e.touches[1].clientX)/2;
+                lastPinchMidY2=(e.touches[0].clientY+e.touches[1].clientY)/2;
+                e.preventDefault();return;}
+              if(e.touches.length===1&&!pinching2){
+                e.preventDefault();const p=getXY2(e.touches[0]);
+                if(vecEyedropperRef.current){
+                  const baseImg=el.parentElement?.querySelector("img");if(baseImg){
+                    const tc2=document.createElement("canvas");tc2.width=baseImg.naturalWidth||800;tc2.height=baseImg.naturalHeight||800;
+                    tc2.getContext("2d").drawImage(baseImg,0,0,tc2.width,tc2.height);
+                    const ix=Math.floor(p.x*tc2.width/el.width),iy=Math.floor(p.y*tc2.height/el.height);
+                    const px2=tc2.getContext("2d").getImageData(ix,iy,1,1).data;
+                    setVecDrawColor("#"+[px2[0],px2[1],px2[2]].map(v=>v.toString(16).padStart(2,"0")).join(""));setVecEyedropper(false);
+                  }return;}
+                vecPushHistory();strokeStartedAt2=Date.now();
+                vecIsDrawing.current=true;const ctx=el.getContext("2d");
+                const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
+                if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
+                else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
+                ctx.lineCap="round";ctx.lineJoin="round";
+                ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);
+              }
+            },{passive:false});
+            el.addEventListener("touchmove",(e)=>{
+              if(e.touches.length>=2){
+                if(vecIsDrawing.current&&Date.now()-strokeStartedAt2<200){vecUndoDraw();}
+                vecIsDrawing.current=false;pinching2=true;
+                e.preventDefault();
+                const dx2=e.touches[0].clientX-e.touches[1].clientX,dy2=e.touches[0].clientY-e.touches[1].clientY;
+                const dist=Math.sqrt(dx2*dx2+dy2*dy2);
+                const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+                const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+                if(lastPinchDist2>0){const scale2=dist/lastPinchDist2;setPageZoom(z=>Math.max(0.3,Math.min(6,z*scale2)));}
+                const sp=scrollParent2();
+                if(sp){sp.scrollLeft-=(midX-lastPinchMidX2);sp.scrollTop-=(midY-lastPinchMidY2);}
+                lastPinchDist2=dist;lastPinchMidX2=midX;lastPinchMidY2=midY;return;}
+              if(!vecIsDrawing.current||pinching2)return;e.preventDefault();
+              const p=getXY2(e.touches[0]);const ctx=el.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke();
+            },{passive:false});
+            el.addEventListener("touchend",(e)=>{
+              if(e.touches.length<2){pinching2=false;lastPinchDist2=0;}
+              if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveVecDraw();}
+            });
+          }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>
+        </div>
+        :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
+          <div style={{fontSize:48,marginBottom:12}}>🎨</div>
+          <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert</div>
+          <div style={{fontSize:12,marginTop:4}}>Choose a color count above and select an image</div>
+        </div>)}
+        {artStyle==="poly"&&(polyPng?<img src={polyPng} style={{transform:`scale(${pageZoom})`,transformOrigin:"top center",maxWidth:"100%",height:"auto"}}/>
+        :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
+          <div style={{fontSize:48,marginBottom:12}}>🔷</div>
+          <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert to poly art</div>
+          <div style={{fontSize:12,marginTop:4}}>Set density and color count, then select an image</div>
+        </div>)}
+      </div>
+
+      {/* === BOTTOM: Color palette + Draw tools + Zoom + Actions (thumb zone) === */}
+      {/* Color Palette */}
+      <div style={{padding:"4px 10px 2px",flexShrink:0}}>
+        <div style={{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center"}}>
+          {artStyle==="pixel"&&<>
+            <button onClick={()=>setPixelEraser(e=>!e)} style={tbtn(pixelEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",padding:"6px 10px"}:{color:"#ccc",padding:"6px 10px"})}>
+              {pixelEraser?<span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span>:"✏️"}</button>
+            <div style={{width:1,height:24,background:"rgba(255,255,255,.1)"}}/>
+            {[
+              PIXEL_PALETTE.find(p=>p.n==="321"),PIXEL_PALETTE.find(p=>p.n==="797"),PIXEL_PALETTE.find(p=>p.n==="973"),
+              PIXEL_PALETTE.find(p=>p.n==="699"),PIXEL_PALETTE.find(p=>p.n==="740"),PIXEL_PALETTE.find(p=>p.n==="550"),
+              PIXEL_PALETTE.find(p=>p.n==="310"),PIXEL_PALETTE.find(p=>p.n==="414"),PIXEL_PALETTE.find(p=>p.n==="Blanc")
+            ].filter(Boolean).map(p=>(<div key={p.n} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} ${p.nm}`}
+              style={cSwatch(p.c,pixelColor===p.c&&!pixelEraser,28)}/>))}
+            <button onClick={()=>{setShowPixPicker(v=>!v);setPixPaletteSearch("");}} style={tbtn({padding:"6px 10px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>{showPixPicker?"▼":"🎨"}</button>
+          </>}
+          {(artStyle==="vector"||artStyle==="poly")&&<>
+            {(vecPalExpanded?sortedColors:sortedColors.slice(0,10)).map((c,i)=><div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);setVecEyedropper(false);}}
+              style={cSwatch(c.color,vecDrawColor===c.color&&!vecDrawEraser,28)}/>)}
+            {sortedColors.length>10&&!vecPalExpanded&&<button onClick={()=>setVecPalExpanded(true)}
+              style={tbtn({padding:"4px 8px",fontSize:10,color:"#999"})}>+{sortedColors.length-10}</button>}
+            {vecPalExpanded&&sortedColors.length>10&&<button onClick={()=>setVecPalExpanded(false)}
+              style={tbtn({padding:"4px 8px",fontSize:10,color:"#feca57"})}>▲</button>}
+            {artColors.length===0&&["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
+              style={cSwatch(c,vecDrawColor===c&&!vecDrawEraser,28)}/>)}
+          </>}
+        </div>
+      </div>
+      {/* Full DMC palette (pixel) */}
+      {artStyle==="pixel"&&showPixPicker&&<div style={{padding:"4px 10px 4px",flexShrink:0}}>
+        <input value={pixPaletteSearch} onChange={e=>setPixPaletteSearch(e.target.value)} placeholder="Search DMC # or color name..." style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#e8e0f0",fontSize:11,outline:"none",marginBottom:4,boxSizing:"border-box"}}/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(12,1fr)",gap:2,maxHeight:160,overflowY:"auto",overflowX:"hidden"}}>
+          {(pixPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=pixPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>(<div key={p.n+p.c} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} — ${p.nm}`}
+            style={{position:"relative",aspectRatio:"1",borderRadius:3,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)<80?"1px solid rgba(255,255,255,.35)":"1px solid rgba(0,0,0,.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minWidth:0}}>
+            <span style={{fontSize:6,fontWeight:700,color:(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)>128?"rgba(0,0,0,.5)":"rgba(255,255,255,.6)",lineHeight:1,textAlign:"center",overflow:"hidden"}}>{p.n}</span>
+          </div>))}
+        </div>
+        <div style={{fontSize:10,marginTop:4,textAlign:"center",color:"rgba(232,224,240,.5)"}}>
+          <span style={{fontWeight:700}}>DMC {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.n||"—"}</span>
+          <span style={{opacity:.6}}> — {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.nm||"Custom"}</span>
+        </div>
+      </div>}
+      {/* Thread list (pixel) */}
+      {artStyle==="pixel"&&showPixPicker&&(()=>{const pixels=getPixels();
+        const colorCounts={};Object.values(pixels).forEach(color=>{colorCounts[color]=(colorCounts[color]||0)+1;});
+        const ranked=Object.entries(colorCounts).sort((a,b)=>b[1]-a[1]);
+        return ranked.length>0?<div style={{padding:"2px 10px 4px",flexShrink:0}}>
+          <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 Thread List ({ranked.length} colors · {Object.keys(pixels).length} total pixels)</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:3,maxHeight:100,overflowY:"auto"}}>
+            {ranked.map(([color,count],i)=>{const p=PIXEL_PALETTE.find(p2=>p2.c===color);return <div key={color} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.04)",borderRadius:5,padding:"2px 6px"}}>
+              <div style={cSwatch(color,false,14)}><span style={{fontSize:7,fontWeight:800,color:parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114>128?"#000":"#fff"}}>{i+1}</span></div>
+              <span style={{fontSize:9,color:"#feca57",fontWeight:700}}>#{i+1}</span>
+              {p&&<span style={{fontSize:9,color:"#e8e0f0",fontWeight:700}}>DMC {p.n}</span>}
+              <span style={{fontSize:8,color:"rgba(232,224,240,.3)"}}>({count}px)</span>
+            </div>;})}
+          </div>
+        </div>:null;
+      })()}
+      {/* Thread list (vector/poly) */}
+      {(artStyle==="vector"||artStyle==="poly")&&artColors.length>0&&<div style={{padding:"2px 10px 4px",flexShrink:0}}>
+        <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 {artColors.length} colors</div>
+      </div>}
+
+      {/* Draw tools row */}
+      <div style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",flexShrink:0}}>
+        {artStyle==="pixel"&&<>
+          <button onClick={undoPixel} style={tbtn({color:"#aaa"})}>↩</button>
+          <button onClick={redoPixel} style={tbtn({color:"#aaa"})}>↪</button>
+        </>}
+        {artStyle==="vector"&&hasVecContent&&<>
+          <button onClick={vecUndoDraw} style={tbtn({color:"#aaa"})}>↩</button>
+          <button onClick={vecRedoDraw} style={tbtn({color:"#aaa"})}>↪</button>
+          <button onClick={()=>{setVecDrawEraser(false);setVecEyedropper(e=>!e);}} style={tbtn(vecEyedropper?{background:"rgba(67,233,123,.2)",border:"1px solid rgba(67,233,123,.4)",color:"#43e97b"}:{color:"#888"})}>💧</button>
+          <button onClick={()=>{setVecEyedropper(false);setVecDrawEraser(e=>!e);}} style={tbtn(vecDrawEraser?{background:"rgba(245,87,108,.2)",border:"1px solid rgba(245,87,108,.4)",color:"#f5576c"}:{color:"#888"})}>{vecDrawEraser?<span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span>:"✏️"}</button>
+          <div style={{display:"flex",gap:2,alignItems:"center"}}>
+            {[2,4,8,14].map(s=><div key={s} onClick={()=>setVecDrawSize(s)} style={{width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,background:vecDrawSize===s?"rgba(255,255,255,.12)":"transparent",border:vecDrawSize===s?"1px solid "+vecDrawColor:"1px solid transparent",cursor:"pointer"}}><div style={{width:Math.max(s,2),height:Math.max(s,2),borderRadius:"50%",background:vecDrawEraser?"rgba(245,87,108,.7)":vecDrawColor}}/></div>)}
+          </div>
+        </>}
+        {artStyle==="pixel"&&<>
+          <div style={{width:1,height:24,background:"rgba(255,255,255,.08)"}}/>
+          <button onClick={()=>{setShowPixNumbers(v=>{const nv=!v;setTimeout(drawPixelGrid,10);return nv;});}} style={tbtn(showPixNumbers?{background:"rgba(254,202,87,.12)",border:"1px solid rgba(254,202,87,.4)",color:"#feca57",fontSize:11,padding:"6px 10px"}:{fontSize:11,padding:"6px 10px",color:"#888"})}>#</button>
+          <span style={{fontSize:10,opacity:.3,fontWeight:700}}>Grid:</span>
+          {[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
+            <button key={g.v} onClick={()=>setPixelGridLines(g.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:pixelGridLines===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:pixelGridLines===g.v?"rgba(254,202,87,.12)":"transparent",color:pixelGridLines===g.v?"#feca57":"#666",cursor:"pointer"}}>{g.l}</button>))}
+        </>}
+        {artStyle==="vector"&&hasVecContent&&<>
+          <div style={{width:1,height:24,background:"rgba(255,255,255,.08)"}}/>
+          <span style={{fontSize:10,opacity:.3,fontWeight:700}}>Grid:</span>
+          {[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
+            <button key={g.v} onClick={()=>setVecGrid(g.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:vecGrid===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:vecGrid===g.v?"rgba(254,202,87,.12)":"transparent",color:vecGrid===g.v?"#feca57":"#555",cursor:"pointer"}}>{g.l}</button>))}
+        </>}
+      </div>
+
+      {/* Bottom row: zoom + actions */}
+      <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px 8px",flexShrink:0}}>
+        <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={tbtn({padding:"6px 10px"})}>−</button>
+        <span style={{fontSize:11,opacity:.4,minWidth:36,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
+        <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={tbtn({padding:"6px 10px"})}>+</button>
+        <div style={{flex:1}}/>
+        {artStyle==="pixel"&&<button onClick={()=>{if(!confirm("Clear all pixels?"))return;const d2=readNb();if(d2.pages?.[nbPageIdx]){d2.pages[nbPageIdx].pixels={};writeNb(d2);drawPixelGrid();}}}
+          style={tbtn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:12})}>🗑 Clear</button>}
+        <button onClick={doSave} style={tbtn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",fontSize:12}:{color:"#888",fontSize:12})}>{saved?"✓":"💾"}</button>
+        <button onClick={doArtPrint} style={tbtn({color:"#888",fontSize:12})}>🖨</button>
+        <button onClick={doSavePng} style={tbtn({color:"#888",fontSize:12})}>💾</button>
+        <button onClick={archiveCurrentPage} style={tbtn({color:"#888",fontSize:12})}>🗃️</button>
+        <button onClick={deleteCurrentPage} style={tbtn({color:"#888",fontSize:12})}>🗑️</button>
+      </div>
+    </div>);
+  }
   // ═══ VECTOR ART ENGINE ═══
   // ═══ VECTOR ART ENGINE — paint-by-number posterizer ═══
   const traceImageToSvg=(imgSrc,colorCount,callback)=>{
@@ -7219,262 +7498,6 @@ const NotebookPanel=()=>{
   const saveVecDraw=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const d=readNb();const pi=pageIdxRef.current;
     if(d.pages?.[pi]){d.pages[pi].vecDrawData=c.toDataURL("image/png");saveNb(d);}};
 
-  // ═══ VECTOR PAGE ═══
-  if(nbView==="page"&&nbData.pages[nbPageIdx]?.type==="vector"){
-    const page=nbData.pages[nbPageIdx];
-    const hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
-    const vecSvg=vecSvgRef.current||page.vectorSvg||"";
-    const vecPng=page.vectorPng||"";
-    const vecColors=page.vectorColors||[];
-    const hasVecContent=vecSvg||vecPng;
-    // Sort colors by hue for gradient display
-    const sortedColors=(()=>{if(!vecColors.length)return[];
-      return [...vecColors].sort((a,b)=>{
-        const hue=(hex)=>{const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,bl=parseInt(hex.slice(5,7),16)/255;
-          const mx=Math.max(r,g,bl),mn=Math.min(r,g,bl),d=mx-mn;if(d===0)return 0;
-          let h=0;if(mx===r)h=((g-bl)/d)%6;else if(mx===g)h=(bl-r)/d+2;else h=(r-g)/d+4;
-          return(h*60+360)%360;};
-        const lum=(hex)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),bl=parseInt(hex.slice(5,7),16);return r*.299+g*.587+bl*.114;};
-        const ha=hue(a.color),hb=hue(b.color);if(Math.abs(ha-hb)>15)return ha-hb;return lum(a.color)-lum(b.color);
-      });})();
-    // Color swatch with contrast border
-    const cSwatch=(color,selected,size=24)=>{
-      const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
-      const borderC=selected?"#feca57":lum<80?"rgba(255,255,255,.35)":"rgba(0,0,0,.2)";
-      return{width:size,height:size,borderRadius:4,background:color,border:selected?`2px solid ${borderC}`:`1px solid ${borderC}`,cursor:"pointer",boxSizing:"border-box",flexShrink:0};
-    };
-    // Print handler
-    const doPrint=()=>{
-      const d=readNb();const pg=d.pages?.[pageIdxRef.current];if(!pg)return;
-      const imgSrc=pg.vectorPng;const vc=pg.vectorColors||[];if(!imgSrc)return;
-      const showNums=confirm("Include color numbers on the printout?");
-      const legendHtml=vc.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-block"></span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""} <span style="color:#888">(${c.count}px)</span></span>`).join("");
-      const printEl=document.createElement("div");printEl.id="zobuddy-print-overlay";
-      printEl.innerHTML=`<style>#zobuddy-print-overlay{position:fixed;inset:0;z-index:9999;background:#fff;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:12px}@media print{#zobuddy-print-overlay .no-print{display:none!important}#zobuddy-print-overlay{position:static}}</style><div class="no-print" style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button><button onclick="document.getElementById('zobuddy-print-overlay').remove()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">✕ Close</button></div><h3 style="margin:4px 0;color:#000">${(page.title||"Flat Art").replace(/</g,"&lt;")}</h3><div style="position:relative;display:inline-block;max-width:90vw"><img src="${imgSrc}" style="max-width:100%;height:auto;display:block"/></div><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div>`;
-      document.body.appendChild(printEl);
-    };
-    // Bigger button style for thumb targets
-    const tbtn=(extra)=>({background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 12px",fontSize:14,color:"#ccc",cursor:"pointer",fontWeight:700,minWidth:36,textAlign:"center",...extra});
-    return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <input ref={vecFileRef} type="file" accept="image/*" style={{display:"none"}}/>
-      {/* TOP ROW: ← nav, title, grid, save */}
-      <div style={{display:"flex",alignItems:"center",gap:4,padding:"8px 10px 4px",flexShrink:0}}>
-        <button onClick={goToc} style={btn()}>←</button>
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,minWidth:0}}>
-          <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
-          {renaming?<input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
-            onBlur={()=>{if(renameVal.trim()){save("title",renameVal.trim());syncState();}setRenaming(false);}}
-            onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
-            style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:100}}/>
-          :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:100}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
-          <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
-        </div>
-        {hasVecContent&&<>{[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
-          <button key={g.v} onClick={()=>setVecGrid(g.v)} style={{padding:"2px 5px",borderRadius:5,fontSize:9,fontWeight:700,border:vecGrid===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:vecGrid===g.v?"rgba(254,202,87,.12)":"transparent",color:vecGrid===g.v?"#feca57":"#555",cursor:"pointer"}}>{g.l}</button>))}</>}
-        <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"✓":"Save"}</button>
-      </div>
-      {/* ROW 2: Convert options (less frequent, ok at top) */}
-      <div style={{display:"flex",alignItems:"center",gap:3,padding:"2px 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Convert:</span>
-        <button onClick={()=>vecConvert(8)} disabled={vecImporting}
-          style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{vecImporting?"...":"📷8"}</button>
-        <button onClick={()=>vecConvert(16)} disabled={vecImporting}
-          style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{vecImporting?"...":"📷16"}</button>
-        <button onClick={()=>vecConvert(32)} disabled={vecImporting}
-          style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{vecImporting?"...":"📷32"}</button>
-        <button onClick={()=>setShowVecMoreColors(v=>!v)} style={btn({fontSize:9,padding:"3px 6px",color:showVecMoreColors?"#feca57":"#888"})}>{showVecMoreColors?"▼":"▶"}Custom</button>
-        {showVecMoreColors&&<>
-          <input value={vecCustomColorCount} onChange={e=>setVecCustomColorCount(e.target.value.replace(/\D/g,""))} style={{width:36,padding:"2px 4px",borderRadius:4,border:"1px solid rgba(102,126,234,.3)",background:"rgba(102,126,234,.06)",color:"#a8b4f0",fontSize:10,fontWeight:700,textAlign:"center",outline:"none"}}/>
-          <button onClick={()=>{const n=Math.max(2,Math.min(438,Number(vecCustomColorCount)||32));vecConvert(n);}} disabled={vecImporting}
-            style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{vecImporting?"...":"📷Go"}</button>
-          <button onClick={()=>vecConvert(0)} disabled={vecImporting}
-            style={btn({background:"rgba(240,147,251,.1)",border:"1px solid rgba(240,147,251,.2)",color:"#f093fb",fontSize:9,padding:"3px 6px"})}>{vecImporting?"...":"📷All"}</button>
-        </>}
-        {page.vectorOriginal&&<>
-          <div style={{flex:1}}/>
-          <span style={{fontSize:10,opacity:.4}}>📷</span>
-          <input type="range" min="0" max="100" value={vecOrigOpacity*100} onChange={e=>setVecOrigOpacity(Number(e.target.value)/100)}
-            style={{width:50,height:4,accentColor:"#60a5fa",opacity:.7}}/>
-          <span style={{fontSize:9,opacity:.3}}>{Math.round(vecOrigOpacity*100)}%</span>
-        </>}
-      </div>
-      {/* Crop UI */}
-      {vecCropImg&&<div style={{position:"absolute",inset:0,zIndex:100,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",overflow:"auto"}}>
-        <div style={{padding:"12px 16px",flexShrink:0}}>
-          <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0",marginBottom:2}}>Crop & Convert</div>
-          <div style={{fontSize:11,color:"#888"}}>Drag center to move · Drag corners to resize</div>
-        </div>
-        <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",padding:"0 16px"}}>
-          <div style={{position:"relative",width:"100%",maxWidth:300,touchAction:"none"}}
-            onPointerDown={(e)=>{const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
-              const b=vecCropBox;const corner=8;
-              if(Math.abs(px-b.x)<corner&&Math.abs(py-b.y)<corner)vecCropDrag.current={type:"tl",sx:px,sy:py,sb:{...b}};
-              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-b.y)<corner)vecCropDrag.current={type:"tr",sx:px,sy:py,sb:{...b}};
-              else if(Math.abs(px-b.x)<corner&&Math.abs(py-(b.y+b.h))<corner)vecCropDrag.current={type:"bl",sx:px,sy:py,sb:{...b}};
-              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-(b.y+b.h))<corner)vecCropDrag.current={type:"br",sx:px,sy:py,sb:{...b}};
-              else vecCropDrag.current={type:"move",sx:px,sy:py,sb:{...b}};
-              e.currentTarget.setPointerCapture(e.pointerId);}}
-            onPointerMove={(e)=>{if(!vecCropDrag.current)return;const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
-              const d=vecCropDrag.current;const dx=px-d.sx,dy=py-d.sy;const s=d.sb;
-              if(d.type==="move")setVecCropBox({...s,x:Math.max(0,Math.min(100-s.w,s.x+dx)),y:Math.max(0,Math.min(100-s.h,s.y+dy))});
-              else if(d.type==="br")setVecCropBox({...s,w:Math.max(10,Math.min(100-s.x,s.w+dx)),h:Math.max(10,Math.min(100-s.y,s.h+dy))});
-              else if(d.type==="tl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h-dy);setVecCropBox({x:s.x+s.w-nw,y:s.y+s.h-nh,w:nw,h:nh});}
-              else if(d.type==="tr"){const nw=Math.max(10,s.w+dx),nh=Math.max(10,s.h-dy);setVecCropBox({x:s.x,y:s.y+s.h-nh,w:Math.min(100-s.x,nw),h:nh});}
-              else if(d.type==="bl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h+dy);setVecCropBox({x:s.x+s.w-nw,y:s.y,w:nw,h:Math.min(100-s.y,nh)});}}}
-            onPointerUp={()=>{vecCropDrag.current=null;}}>
-            <img src={vecCropImg} style={{width:"100%",height:"auto",borderRadius:6,display:"block",pointerEvents:"none"}}/>
-            <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:`${vecCropBox.x}%`,width:`${vecCropBox.w}%`,height:`${vecCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:3,pointerEvents:"none"}}/>
-            {/* Corner handles */}
-            {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h])=>(
-              <div key={v+h} style={{position:"absolute",[v]:v==="top"?`${vecCropBox.y}%`:`${vecCropBox.y+vecCropBox.h}%`,[h]:h==="left"?`${vecCropBox.x}%`:`${vecCropBox.x+vecCropBox.w}%`,width:20,height:20,marginLeft:-10,marginTop:-10,borderRadius:10,background:"#feca57",border:"2px solid #000",pointerEvents:"none"}}/>))}
-            {/* Darkened outside */}
-            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
-              <div style={{position:"absolute",top:0,left:0,right:0,height:`${vecCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
-              <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-vecCropBox.y-vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-              <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:0,width:`${vecCropBox.x}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-              <div style={{position:"absolute",top:`${vecCropBox.y}%`,right:0,width:`${100-vecCropBox.x-vecCropBox.w}%`,height:`${vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-            </div>
-          </div>
-        </div>
-        <div style={{padding:"10px 16px",flexShrink:0,display:"flex",gap:8,justifyContent:"center"}}>
-          <button onClick={vecConfirmCrop} style={{padding:"10px 28px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:15,fontWeight:700,cursor:"pointer"}}>Convert</button>
-          <button onClick={()=>setVecCropImg(null)} style={{padding:"10px 28px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
-        </div>
-      </div>}
-      {/* === IMAGE AREA === */}
-      <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:8}}>
-        {hasVecContent?<div style={{position:"relative",display:"inline-block"}}>
-          <img ref={(el)=>{if(el)el._vecImg=true;}} src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
-            const img=e.target;const nw=img.naturalWidth,nh=img.naturalHeight;
-            if(nw&&nh&&(nw!==vecImgW||nh!==vecImgH)){setVecImgW(nw);setVecImgH(nh);}
-          }}/>
-          {/* Original photo overlay */}
-          {page.vectorOriginal&&vecOrigOpacity>0&&<img src={page.vectorOriginal} style={{position:"absolute",inset:0,width:"100%",height:"100%",opacity:vecOrigOpacity,pointerEvents:"none",mixBlendMode:"normal"}}/>}
-          {/* Square grid overlay — true squares based on shorter dimension, dotted lines for partial edge cells */}
-          {vecGrid>0&&(()=>{
-            const natW=vecImgW,natH=vecImgH;
-            const cellSize=Math.min(natW,natH)/vecGrid;
-            const cols=Math.floor(natW/cellSize),rows=Math.floor(natH/cellSize);
-            const remX=natW-cols*cellSize,remY=natH-rows*cellSize;
-            return <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox={`0 0 ${natW} ${natH}`} preserveAspectRatio="none">
-              {/* Solid grid lines for full squares */}
-              {Array.from({length:cols-1},(_,i)=><line key={"v"+i} x1={cellSize*(i+1)} y1="0" x2={cellSize*(i+1)} y2={rows*cellSize} stroke="rgba(255,255,255,.4)" strokeWidth="1"/>)}
-              {Array.from({length:rows-1},(_,i)=><line key={"h"+i} x1="0" y1={cellSize*(i+1)} x2={cols*cellSize} y2={cellSize*(i+1)} stroke="rgba(255,255,255,.4)" strokeWidth="1"/>)}
-              {/* Dotted extension lines for partial edge columns */}
-              {remX>2&&<>
-                <line x1={cols*cellSize} y1="0" x2={cols*cellSize} y2={rows*cellSize} stroke="rgba(255,255,255,.5)" strokeWidth="1" strokeDasharray="4,3"/>
-                {Array.from({length:rows-1},(_,i)=><line key={"he"+i} x1={cols*cellSize} y1={cellSize*(i+1)} x2={natW} y2={cellSize*(i+1)} stroke="rgba(255,255,255,.3)" strokeWidth="1" strokeDasharray="3,3"/>)}
-              </>}
-              {/* Dotted extension lines for partial edge rows */}
-              {remY>2&&<>
-                <line x1="0" y1={rows*cellSize} x2={cols*cellSize} y2={rows*cellSize} stroke="rgba(255,255,255,.5)" strokeWidth="1" strokeDasharray="4,3"/>
-                {Array.from({length:cols-1},(_,i)=><line key={"ve"+i} x1={cellSize*(i+1)} y1={rows*cellSize} x2={cellSize*(i+1)} y2={natH} stroke="rgba(255,255,255,.3)" strokeWidth="1" strokeDasharray="3,3"/>)}
-              </>}
-            </svg>;
-          })()}
-          {/* Draw overlay canvas — always active */}
-          <canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
-            const d=readNb();const dd=d.pages?.[pageIdxRef.current]?.vecDrawData;
-            if(dd){const img2=new Image();img2.onload=()=>{el.getContext("2d").drawImage(img2,0,0);vecPushHistory();};img2.src=dd;}else{vecPushHistory();}
-            const getXY=(e)=>{const r=el.getBoundingClientRect();return{x:(e.clientX-r.left)*el.width/r.width,y:(e.clientY-r.top)*el.height/r.height};};
-            let pinching=false;let lastPinchDist=0;let lastPinchMidX=0;let lastPinchMidY=0;
-            let strokeStartedAt=0;
-            const scrollParent=()=>{let p=el.parentElement;while(p){if(p.scrollHeight>p.clientHeight||p.scrollWidth>p.clientWidth)return p;p=p.parentElement;}return null;};
-            el.addEventListener("touchstart",(e)=>{
-              if(e.touches.length>=2){
-                if(vecIsDrawing.current&&Date.now()-strokeStartedAt<200){vecUndoDraw();}
-                vecIsDrawing.current=false;pinching=true;
-                const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
-                lastPinchDist=Math.sqrt(dx*dx+dy*dy);
-                lastPinchMidX=(e.touches[0].clientX+e.touches[1].clientX)/2;
-                lastPinchMidY=(e.touches[0].clientY+e.touches[1].clientY)/2;
-                e.preventDefault();return;}
-              if(e.touches.length===1&&!pinching){
-                e.preventDefault();const p=getXY(e.touches[0]);
-                if(vecEyedropperRef.current){
-                  const baseImg=el.parentElement?.querySelector("img");if(baseImg){
-                    const tc2=document.createElement("canvas");tc2.width=baseImg.naturalWidth||800;tc2.height=baseImg.naturalHeight||800;
-                    tc2.getContext("2d").drawImage(baseImg,0,0,tc2.width,tc2.height);
-                    const ix=Math.floor(p.x*tc2.width/el.width),iy=Math.floor(p.y*tc2.height/el.height);
-                    const px=tc2.getContext("2d").getImageData(ix,iy,1,1).data;
-                    setVecDrawColor("#"+[px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,"0")).join(""));setVecEyedropper(false);
-                  }return;}
-                vecPushHistory();strokeStartedAt=Date.now();
-                vecIsDrawing.current=true;const ctx=el.getContext("2d");
-                const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
-                if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
-                else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
-                ctx.lineCap="round";ctx.lineJoin="round";
-                ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);
-              }
-            },{passive:false});
-            el.addEventListener("touchmove",(e)=>{
-              if(e.touches.length>=2){
-                if(vecIsDrawing.current&&Date.now()-strokeStartedAt<200){vecUndoDraw();}
-                vecIsDrawing.current=false;pinching=true;
-                e.preventDefault();
-                const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
-                const dist=Math.sqrt(dx*dx+dy*dy);
-                const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
-                const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
-                if(lastPinchDist>0){const scale=dist/lastPinchDist;setPageZoom(z=>Math.max(0.3,Math.min(6,z*scale)));}
-                const sp=scrollParent();
-                if(sp){sp.scrollLeft-=(midX-lastPinchMidX);sp.scrollTop-=(midY-lastPinchMidY);}
-                lastPinchDist=dist;lastPinchMidX=midX;lastPinchMidY=midY;return;}
-              if(!vecIsDrawing.current||pinching)return;e.preventDefault();
-              const p=getXY(e.touches[0]);const ctx=el.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke();
-            },{passive:false});
-            el.addEventListener("touchend",(e)=>{
-              if(e.touches.length<2){pinching=false;lastPinchDist=0;}
-              if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveVecDraw();}
-            });
-          }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>
-        </div>
-        :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
-          <div style={{fontSize:48,marginBottom:12}}>✏️</div>
-          <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert</div>
-          <div style={{fontSize:12,marginTop:4}}>Choose a color count above and select an image</div>
-        </div>}
-      </div>
-      {/* === BOTTOM TOOLBAR (thumb zone) === */}
-      {/* Color palette — gradient-sorted */}
-      {hasVecContent&&<div style={{padding:"4px 10px 2px",flexShrink:0}}>
-        <div style={{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center"}}>
-          {(vecPalExpanded?sortedColors:sortedColors.slice(0,8)).map((c,i)=><div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);setVecEyedropper(false);}}
-            style={cSwatch(c.color,vecDrawColor===c.color&&!vecDrawEraser,28)}/>)}
-          {sortedColors.length>8&&!vecPalExpanded&&<button onClick={()=>setVecPalExpanded(true)}
-            style={{padding:"4px 8px",borderRadius:6,fontSize:10,fontWeight:700,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#999",cursor:"pointer"}}>+{sortedColors.length-8}</button>}
-          {vecPalExpanded&&sortedColors.length>8&&<button onClick={()=>setVecPalExpanded(false)}
-            style={{padding:"4px 8px",borderRadius:6,fontSize:10,fontWeight:700,border:"1px solid rgba(254,202,87,.3)",background:"rgba(254,202,87,.1)",color:"#feca57",cursor:"pointer"}}>▲</button>}
-        </div>
-        {vecColors.length===0&&<div style={{display:"flex",gap:3,marginTop:3}}>
-          {["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
-            style={cSwatch(c,vecDrawColor===c&&!vecDrawEraser,28)}/>)}
-        </div>}
-      </div>}
-      {/* Draw tools row — bigger buttons for thumbs */}
-      {hasVecContent&&<div style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",flexShrink:0}}>
-        <button onClick={vecUndoDraw} style={tbtn({color:"#aaa"})}>↩</button>
-        <button onClick={vecRedoDraw} style={tbtn({color:"#aaa"})}>↪</button>
-        <button onClick={()=>{setVecDrawEraser(false);setVecEyedropper(e=>!e);}} style={tbtn(vecEyedropper?{background:"rgba(67,233,123,.2)",border:"1px solid rgba(67,233,123,.4)",color:"#43e97b"}:{color:"#888"})}>💧</button>
-        <button onClick={()=>{setVecEyedropper(false);setVecDrawEraser(e=>!e);}} style={tbtn(vecDrawEraser?{background:"rgba(245,87,108,.2)",border:"1px solid rgba(245,87,108,.4)",color:"#f5576c"}:{color:"#888"})}>{vecDrawEraser?<span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span>:"✏️"}</button>
-        <div style={{display:"flex",gap:2,alignItems:"center"}}>
-          {[2,4,8,14].map(s=><div key={s} onClick={()=>setVecDrawSize(s)} style={{width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,background:vecDrawSize===s?"rgba(255,255,255,.12)":"transparent",border:vecDrawSize===s?"1px solid "+vecDrawColor:"1px solid transparent",cursor:"pointer"}}><div style={{width:Math.max(s,2),height:Math.max(s,2),borderRadius:"50%",background:vecDrawEraser?"rgba(245,87,108,.7)":vecDrawColor}}/></div>)}
-        </div>
-        <div style={{width:24,height:24,borderRadius:6,background:vecDrawColor,border:"2px solid #feca57",flexShrink:0}}/>
-      </div>}
-      {/* Bottom row: zoom + print/archive/delete */}
-      {hasVecContent&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px 8px",flexShrink:0}}>
-        <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={tbtn({padding:"6px 10px"})}>−</button>
-        <span style={{fontSize:11,opacity:.4,minWidth:36,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
-        <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={tbtn({padding:"6px 10px"})}>+</button>
-        <div style={{flex:1}}/>
-        <button onClick={doPrint} style={tbtn({color:"#888",fontSize:12})}>🖨</button>
-        <button onClick={archiveCurrentPage} style={tbtn({color:"#888",fontSize:12})}>🗃️</button>
-        <button onClick={deleteCurrentPage} style={tbtn({color:"#888",fontSize:12})}>🗑️</button>
-      </div>}
-    </div>);
-  }
 
 
   // ═══ POLY ART ENGINE — grid-jittered triangulation ═══
@@ -7607,113 +7630,6 @@ const NotebookPanel=()=>{
     };ci2.src=src;
   };
 
-  // ═══ POLY ART PAGE ═══
-  if(nbView==="page"&&nbData.pages[nbPageIdx]?.type==="poly"){
-    const page=nbData.pages[nbPageIdx];
-    const hasPrev=nbPageIdx>0,hasNext=nbPageIdx<nbData.pages.length-1;
-    const polyPng=page.polyPng||"";
-    const polyColors=page.polyColors||[];
-    return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
-      <input ref={polyFileRef} type="file" accept="image/*" style={{display:"none"}}/>
-      {/* Row 1: nav */}
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px 4px",flexShrink:0}}>
-        <button onClick={goToc} style={btn()}>←</button>
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,minWidth:0}}>
-          <button onClick={()=>hasPrev&&goPrev()} style={{background:"none",border:"none",fontSize:16,color:hasPrev?"#a8b4f0":"#333",cursor:hasPrev?"pointer":"default",padding:"4px"}}>◀</button>
-          {renaming?<input value={renameVal} onChange={e=>setRenameVal(e.target.value)} autoFocus
-            onBlur={()=>{if(renameVal.trim()){save("title",renameVal.trim());syncState();}setRenaming(false);}}
-            onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
-            style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(102,126,234,.4)",background:"rgba(102,126,234,.1)",color:"#e8e0f0",fontSize:12,fontWeight:700,outline:"none",width:120}}/>
-          :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
-          <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
-        </div>
-        <button onClick={doSave} style={btn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b"}:{color:"#aaa"})}>{saved?"Saved ✓":"Save"}</button>
-      </div>
-      {/* Row 2: convert + density */}
-      <div style={{display:"flex",alignItems:"center",gap:3,padding:"2px 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Convert:</span>
-        {[{n:8,l:"8"},{n:16,l:"16"},{n:32,l:"32"}].map(o=>(
-          <button key={o.n} onClick={()=>polyConvert(o.n)} disabled={polyImporting}
-            style={btn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:9,padding:"3px 6px"})}>{polyImporting?"...":"📷"+o.l}</button>))}
-        <div style={{width:1,height:16,background:"rgba(255,255,255,.08)"}}/>
-        <span style={{fontSize:9,opacity:.4}}>Density:</span>
-        {[{v:100,l:"Low"},{v:300,l:"Med"},{v:600,l:"High"},{v:1200,l:"Ultra"}].map(d=>(
-          <button key={d.v} onClick={()=>setPolyDensity(d.v)} style={{padding:"2px 5px",borderRadius:6,fontSize:9,fontWeight:700,border:polyDensity===d.v?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:polyDensity===d.v?"rgba(102,126,234,.15)":"transparent",color:polyDensity===d.v?"#a8b4f0":"#666",cursor:"pointer"}}>{d.l}</button>))}
-      </div>
-      {/* Row 3: actions */}
-      <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 10px 4px",flexShrink:0,flexWrap:"wrap"}}>
-        <div style={{flex:1}}/>
-        <button onClick={()=>setPageZoom(z=>Math.max(0.3,z-0.2))} style={btn({padding:"3px 7px",fontSize:11})}>−</button>
-        <span style={{fontSize:10,opacity:.4,minWidth:28,textAlign:"center"}}>{Math.round(pageZoom*100)}%</span>
-        <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={btn({padding:"3px 7px",fontSize:11})}>+</button>
-        {polyPng&&<button onClick={()=>{
-          const legendHtml=polyColors.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-block"></span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""}</span>`).join("");
-          const win=window.open("","_blank");
-          if(win){win.document.write(`<html><head><title>${page.title||"Poly Art"}</title><style>@media print{body{margin:0}.no-print{display:none}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${page.title||"Poly Art"}</h3><img src="${polyPng}"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
-        }} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>🖨 Print</button>}
-        <button onClick={archiveCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗃️</button>
-        {polyPng&&<button onClick={()=>saveAsPng(polyPng,page.title||"poly-art")} style={btn({fontSize:10,padding:"3px 8px",color:"#888"})}>💾 PNG</button>}
-        <button onClick={deleteCurrentPage} style={btn({color:"#888",padding:"3px 7px",fontSize:10})}>🗑️</button>
-      </div>
-      {/* Thread list */}
-      {polyColors.length>0&&<div style={{padding:"2px 10px 4px",flexShrink:0}}>
-        <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 {polyColors.length} colors</div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:2}}>
-          {polyColors.map((c,i)=><div key={i} title={`DMC ${c.dmc?.n} ${c.dmc?.nm}`} style={{width:18,height:18,borderRadius:3,background:c.color,border:"1px solid rgba(255,255,255,.1)"}}/>)}
-        </div>
-      </div>}
-      {/* Crop UI */}
-      {polyCropImg&&<div style={{position:"absolute",inset:0,zIndex:100,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",overflow:"auto"}}>
-        <div style={{padding:"12px 16px",flexShrink:0}}>
-          <div style={{fontSize:15,fontWeight:800,color:"#e8e0f0",marginBottom:2}}>Crop & Convert</div>
-          <div style={{fontSize:11,color:"#888"}}>Drag center to move · Drag corners to resize</div>
-        </div>
-        <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",padding:"0 16px"}}>
-          <div style={{position:"relative",width:"100%",maxWidth:300,touchAction:"none"}}
-            onPointerDown={(e)=>{const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
-              const b=polyCropBox;const corner=8;
-              if(Math.abs(px-b.x)<corner&&Math.abs(py-b.y)<corner)polyCropDrag.current={type:"tl",sx:px,sy:py,sb:{...b}};
-              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-b.y)<corner)polyCropDrag.current={type:"tr",sx:px,sy:py,sb:{...b}};
-              else if(Math.abs(px-b.x)<corner&&Math.abs(py-(b.y+b.h))<corner)polyCropDrag.current={type:"bl",sx:px,sy:py,sb:{...b}};
-              else if(Math.abs(px-(b.x+b.w))<corner&&Math.abs(py-(b.y+b.h))<corner)polyCropDrag.current={type:"br",sx:px,sy:py,sb:{...b}};
-              else polyCropDrag.current={type:"move",sx:px,sy:py,sb:{...b}};
-              e.currentTarget.setPointerCapture(e.pointerId);}}
-            onPointerMove={(e)=>{if(!polyCropDrag.current)return;const r=e.currentTarget.getBoundingClientRect();const px=((e.clientX-r.left)/r.width)*100;const py=((e.clientY-r.top)/r.height)*100;
-              const d=polyCropDrag.current;const dx=px-d.sx,dy=py-d.sy;const s=d.sb;
-              if(d.type==="move")setPolyCropBox({...s,x:Math.max(0,Math.min(100-s.w,s.x+dx)),y:Math.max(0,Math.min(100-s.h,s.y+dy))});
-              else if(d.type==="br")setPolyCropBox({...s,w:Math.max(10,Math.min(100-s.x,s.w+dx)),h:Math.max(10,Math.min(100-s.y,s.h+dy))});
-              else if(d.type==="tl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h-dy);setPolyCropBox({x:s.x+s.w-nw,y:s.y+s.h-nh,w:nw,h:nh});}
-              else if(d.type==="tr"){const nw=Math.max(10,s.w+dx),nh=Math.max(10,s.h-dy);setPolyCropBox({x:s.x,y:s.y+s.h-nh,w:Math.min(100-s.x,nw),h:nh});}
-              else if(d.type==="bl"){const nw=Math.max(10,s.w-dx),nh=Math.max(10,s.h+dy);setPolyCropBox({x:s.x+s.w-nw,y:s.y,w:nw,h:Math.min(100-s.y,nh)});}}}
-            onPointerUp={()=>{polyCropDrag.current=null;}}>
-            <img src={polyCropImg} style={{width:"100%",height:"auto",borderRadius:6,display:"block",pointerEvents:"none"}}/>
-            <div style={{position:"absolute",top:`${polyCropBox.y}%`,left:`${polyCropBox.x}%`,width:`${polyCropBox.w}%`,height:`${polyCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:3,pointerEvents:"none"}}/>
-            {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h])=>(
-              <div key={v+h} style={{position:"absolute",[v]:v==="top"?`${polyCropBox.y}%`:`${polyCropBox.y+polyCropBox.h}%`,[h]:h==="left"?`${polyCropBox.x}%`:`${polyCropBox.x+polyCropBox.w}%`,width:20,height:20,marginLeft:-10,marginTop:-10,borderRadius:10,background:"#feca57",border:"2px solid #000",pointerEvents:"none"}}/>))}
-            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
-              <div style={{position:"absolute",top:0,left:0,right:0,height:`${polyCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
-              <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-polyCropBox.y-polyCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-              <div style={{position:"absolute",top:`${polyCropBox.y}%`,left:0,width:`${polyCropBox.x}%`,height:`${polyCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-              <div style={{position:"absolute",top:`${polyCropBox.y}%`,right:0,width:`${100-polyCropBox.x-polyCropBox.w}%`,height:`${polyCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
-            </div>
-          </div>
-        </div>
-        <div style={{padding:"10px 16px",flexShrink:0,display:"flex",gap:8,justifyContent:"center"}}>
-          <button onClick={polyConfirmCrop} style={{padding:"10px 28px",borderRadius:10,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",fontSize:15,fontWeight:700,cursor:"pointer"}}>Convert</button>
-          <button onClick={()=>setPolyCropImg(null)} style={{padding:"10px 28px",borderRadius:10,background:"rgba(255,255,255,.06)",color:"#aaa",border:"1px solid rgba(255,255,255,.1)",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
-        </div>
-      </div>}
-      {/* Image display */}
-      <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:12}}>
-        {polyPng?<img src={polyPng} style={{transform:`scale(${pageZoom})`,transformOrigin:"top center",maxWidth:"100%",height:"auto"}}/>
-        :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
-          <div style={{fontSize:48,marginBottom:12}}>🔷</div>
-          <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert to poly art</div>
-          <div style={{fontSize:12,marginTop:4}}>Set density and color count, then select an image</div>
-        </div>}
-      </div>
-    </div>);
-  }
 
   // ═══ TEXT PAGE ═══
   if(nbView==="page"&&nbData.pages[nbPageIdx]&&nbData.pages[nbPageIdx].type!=="pixel"&&nbData.pages[nbPageIdx].type!=="vector"&&nbData.pages[nbPageIdx].type!=="poly"){
@@ -7852,12 +7768,22 @@ const NotebookPanel=()=>{
     <div style={{background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
       <input value={nbNewTitle} onChange={e=>setNbNewTitle(e.target.value)} placeholder="Page title" style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none",marginBottom:6}}/>
       <div style={{display:"flex",gap:4,marginBottom:6}}>
-        {[{id:"lined",label:"📝 Note"},{id:"pixel",label:"🟨 Pixel Art"},{id:"vector",label:"🎨 Flat Art"},{id:"poly",label:"🔷 Poly Art"}].map(t=>(
+        {[{id:"lined",label:"📝 Note"},{id:"art",label:"🎨 Art"}].map(t=>(
           <button key={t.id} onClick={()=>setNbNewType(t.id)}
             style={{flex:1,padding:"7px 2px",borderRadius:8,border:nbNewType===t.id?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.08)",
               background:nbNewType===t.id?"rgba(102,126,234,.15)":"rgba(255,255,255,.03)",color:nbNewType===t.id?"#a8b4f0":"#888",fontSize:12,fontWeight:700,cursor:"pointer"}}>{t.label}</button>))}
       </div>
-      {nbNewType==="pixel"&&<div style={{marginBottom:6}}>
+      {nbNewType==="art"&&<div style={{marginBottom:6}}>
+        <div style={{fontSize:11,opacity:.4,marginBottom:4}}>Art style:</div>
+        <div style={{display:"flex",gap:4,marginBottom:6}}>
+          {[{id:"pixel",label:"🟨 Pixel",desc:"Grid pixels"},{id:"vector",label:"🎨 Flat",desc:"Smooth regions"},{id:"poly",label:"🔷 Poly",desc:"Triangles"}].map(s=>(
+            <button key={s.id} onClick={()=>setNbNewArtStyle(s.id)}
+              style={{flex:1,padding:"8px 4px",borderRadius:8,border:nbNewArtStyle===s.id?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.08)",
+                background:nbNewArtStyle===s.id?"rgba(254,202,87,.12)":"rgba(255,255,255,.03)",color:nbNewArtStyle===s.id?"#feca57":"#888",fontSize:12,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
+              {s.label}<div style={{fontSize:9,opacity:.5,marginTop:2}}>{s.desc}</div></button>))}
+        </div>
+      </div>}
+      {nbNewType==="art"&&nbNewArtStyle==="pixel"&&<div style={{marginBottom:6}}>
         <div style={{fontSize:11,opacity:.4,marginBottom:4}}>Grid size:</div>
         <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
           {PIXEL_SIZES.map(s=>(<button key={s.id} onClick={()=>setNbPixelSize(s.id)}
@@ -7875,8 +7801,9 @@ const NotebookPanel=()=>{
         </div>}
       </div>}
       <button onClick={()=>{const title=nbNewTitle.trim()||`Page ${nbData.pages.length+1}`;
-        const np={title,type:nbNewType,content:"",drawData:null,pixels:{},created:Date.now()};
-        if(nbNewType==="pixel"){
+        const actualType=nbNewType==="art"?nbNewArtStyle:nbNewType;
+        const np={title,type:actualType,content:"",drawData:null,pixels:{},created:Date.now()};
+        if(actualType==="pixel"){
           if(nbPixelSize==="custom"){const w=Math.max(4,Math.min(512,Number(customPixelW)||32));const h=Math.max(4,Math.min(512,Number(customPixelH)||32));np.pixelSize=`${w}x${h}`;}
           else np.pixelSize=nbPixelSize;
         }
@@ -7895,7 +7822,7 @@ const NotebookPanel=()=>{
           <span style={{fontSize:13,fontWeight:800,color:"rgba(102,126,234,.6)",minWidth:28}}>{i+1}.</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:700,color:"#e8e0f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title||"Untitled"}</div>
-            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 "+(p.pixelSize||"32x32"):p.type==="vector"?"🎨 Flat Art":p.type==="poly"?"🔷 Poly Art":`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
+            <div style={{fontSize:11,opacity:.3}}>{p.type==="pixel"?"🟨 Pixel "+(p.pixelSize||"32x32"):p.type==="vector"?"🎨 Flat Art":p.type==="poly"?"🔷 Poly Art":`📝 ${p.type}`}{p.drawData?" + 🎨":""}</div></div>
           {nbPreviewMode&&<span style={{fontSize:14,opacity:.3,transition:"transform .2s",transform:isExpanded?"rotate(90deg)":"none"}}>▶</span>}
         </div>
         {isExpanded&&<div onClick={openPage} style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",cursor:"pointer"}}>
@@ -8064,22 +7991,81 @@ const LearnPanel=()=>{
         <Card icon={course.icon} title="Free Course" color="rgba(34,211,238)" link={course.url} onFav={()=>toggleCourseFav(course)} isFav={isCourseFav(course)}><div style={{fontSize:16,fontWeight:700}}>{course.name}</div><div style={{fontSize:14,opacity:.5}}>{course.source} • {course.cat}</div></Card>
       </div>}
       {learnTab==="news"&&<div style={{flex:1,overflowY:"auto",padding:"0 14px 14px"}}>
-        {/* Saved Favorites */}
+        {/* Saved Favorites — Card Style */}
         {totalFavs>0&&<div style={{marginBottom:12}}>
-          <div style={{fontSize:12,fontWeight:700,opacity:.35,marginBottom:6}}>SAVED FAVORITES ({totalFavs})</div>
-          <div style={{background:"rgba(254,202,87,.06)",border:"1px solid rgba(254,202,87,.15)",borderRadius:12,padding:8}}>
-          {(learnFavs.quotes||[]).map((q,i)=>(<div key={"fq"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>💬</span><span style={{flex:1,fontSize:12,fontStyle:"italic",opacity:.7}}>"{q.q}" — {q.a}</span><button onClick={()=>toggleSimpleFav("quotes",q,x=>x.q===q.q)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.facts||[]).map((f,i)=>(<div key={"ff"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>🧠</span><span style={{flex:1,fontSize:12,opacity:.7}}>{f.text}</span><button onClick={()=>toggleSimpleFav("facts",f,x=>x.text===f.text)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.words||[]).map((w,i)=>(<div key={"fw"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>📖</span><span style={{flex:1,fontSize:12}}><strong style={{color:"#60a5fa"}}>{w.word}</strong> — <span style={{opacity:.5}}>{w.def}</span></span><button onClick={()=>toggleSimpleFav("words",w,x=>x.word===w.word)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.mindful||[]).map((m,i)=>(<div key={"fm"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{m.icon}</span><span style={{flex:1,fontSize:12,opacity:.7}}>{m.practice}</span><button onClick={()=>toggleSimpleFav("mindful",m,x=>x.practice===m.practice)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.tips||[]).map((t,i)=>(<div key={"fti"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{t.icon}</span><span style={{flex:1,fontSize:12,opacity:.7}}>{t.tip}</span><button onClick={()=>toggleSimpleFav("tips",t,x=>x.tip===t.tip)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {learnFavs.teds.map((t,i)=>(<div key={"ft"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>🎤</span><a href={t.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#f093fb",fontSize:12,fontWeight:700,textDecoration:"none"}}>{t.title}</a><button onClick={()=>toggleTedFav(t)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {learnFavs.books.map((b,i)=>(<div key={"fb"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>📚</span><span style={{flex:1,fontSize:12}}><span style={{color:"#fbbf24",fontWeight:700}}>{b.title}</span><span style={{opacity:.4}}> — {b.author}</span></span><button onClick={()=>toggleBookFav(b)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {learnFavs.courses.map((c,i)=>(<div key={"fc"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{c.icon||"📖"}</span><a href={c.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#22d3ee",fontSize:12,fontWeight:700,textDecoration:"none"}}>{c.name}</a><button onClick={()=>toggleCourseFav(c)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
-          {(learnFavs.news||[]).map((n,i)=>(<div key={"fn"+i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}><span style={{fontSize:12}}>{n.icon}</span><a href={n.url} target="_blank" rel="noopener noreferrer" style={{flex:1,color:"#a8b4f0",fontSize:12,fontWeight:700,textDecoration:"none"}}>{n.name}</a><button onClick={()=>toggleSimpleFav("news",n,x=>x.name===n.name)} style={{background:"none",border:"none",color:"#f5576c",fontSize:11,cursor:"pointer"}}>✕</button></div>))}
+          <div style={{fontSize:12,fontWeight:700,opacity:.35,marginBottom:8}}>SAVED FAVORITES ({totalFavs})</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {(learnFavs.quotes||[]).map((q,i)=>(<div key={"fq"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(254,202,87,.06)",border:"1px solid rgba(254,202,87,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>💬</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,fontStyle:"italic",color:"rgba(232,224,240,.8)",lineHeight:1.4,marginBottom:2}}>"{q.q}"</div>
+              <div style={{fontSize:12,opacity:.4}}>— {q.a}</div>
+            </div>
+            <button onClick={()=>toggleSimpleFav("quotes",q,x=>x.q===q.q)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {(learnFavs.facts||[]).map((f,i)=>(<div key={"ff"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(147,130,250,.06)",border:"1px solid rgba(147,130,250,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>🧠</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,color:"rgba(232,224,240,.8)",lineHeight:1.4}}>{f.text}</div>
+            </div>
+            <button onClick={()=>toggleSimpleFav("facts",f,x=>x.text===f.text)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {(learnFavs.words||[]).map((w,i)=>(<div key={"fw"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>📖</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:16,fontWeight:800,color:"#60a5fa",marginBottom:2}}>{w.word}</div>
+              <div style={{fontSize:13,opacity:.5,lineHeight:1.4}}>{w.def}</div>
+            </div>
+            <button onClick={()=>toggleSimpleFav("words",w,x=>x.word===w.word)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {(learnFavs.mindful||[]).map((m,i)=>(<div key={"fm"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(67,233,123,.06)",border:"1px solid rgba(67,233,123,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{m.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,color:"rgba(232,224,240,.8)",lineHeight:1.4}}>{m.practice}</div>
+            </div>
+            <button onClick={()=>toggleSimpleFav("mindful",m,x=>x.practice===m.practice)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {(learnFavs.tips||[]).map((t,i)=>(<div key={"fti"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(240,147,251,.06)",border:"1px solid rgba(240,147,251,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{t.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,color:"rgba(232,224,240,.8)",lineHeight:1.4}}>{t.tip}</div>
+            </div>
+            <button onClick={()=>toggleSimpleFav("tips",t,x=>x.tip===t.tip)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {learnFavs.teds.map((t,i)=>(<div key={"ft"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(240,147,251,.06)",border:"1px solid rgba(240,147,251,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>🎤</span>
+            <a href={t.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:800,color:"#f093fb",lineHeight:1.3}}>{t.title}</div>
+              {t.speaker&&<div style={{fontSize:12,opacity:.4,marginTop:2}}>{t.speaker}</div>}
+            </a>
+            <button onClick={()=>toggleTedFav(t)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {learnFavs.books.map((b,i)=>(<div key={"fb"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>📚</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:800,color:"#fbbf24",lineHeight:1.3}}>{b.title}</div>
+              <div style={{fontSize:12,opacity:.4,marginTop:2}}>{b.author}</div>
+            </div>
+            <button onClick={()=>toggleBookFav(b)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {learnFavs.courses.map((c,i)=>(<div key={"fc"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(34,211,238,.06)",border:"1px solid rgba(34,211,238,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{c.icon||"📖"}</span>
+            <a href={c.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:800,color:"#22d3ee",lineHeight:1.3}}>{c.name}</div>
+              {c.source&&<div style={{fontSize:12,opacity:.4,marginTop:2}}>{c.source}</div>}
+            </a>
+            <button onClick={()=>toggleCourseFav(c)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
+          {(learnFavs.news||[]).map((n,i)=>(<div key={"fn"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)"}}>
+            <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{n.icon}</span>
+            <a href={n.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:800,color:"#a8b4f0",lineHeight:1.3}}>{n.name}</div>
+            </a>
+            <button onClick={()=>toggleSimpleFav("news",n,x=>x.name===n.name)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
+          </div>))}
           </div>
         </div>}
-        {totalFavs===0&&<div style={{textAlign:"center",padding:"16px 0 12px",opacity:.35,fontSize:13}}>Star items from Picks to save them here</div>}
+        {totalFavs===0&&<div style={{textAlign:"center",padding:"24px 0 16px",opacity:.35,fontSize:14}}>Star items from Picks to save them here</div>}
         {/* Fave Sites */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{fontSize:12,fontWeight:700,opacity:.35}}>FAVORITE SITES</div>
@@ -10732,7 +10718,7 @@ class ErrorBoundary extends React.Component {
         React.createElement("h2",{style:{color:"#f5576c"}},"Something went wrong"),
         React.createElement("pre",{style:{fontSize:12,whiteSpace:"pre-wrap",color:"#feca57",marginTop:10}},String(this.state.error)),
         React.createElement("button",{onClick:()=>{this.setState({hasError:false,error:null});},style:{marginTop:16,padding:"10px 20px",background:"#667eea",color:"#fff",border:"none",borderRadius:10,fontSize:16}},"Try Again"),
-        React.createElement("button",{onClick:()=>{ZobuddyDB.remove("zodibuddies_v1");window.location.reload();},style:{marginTop:8,marginLeft:8,padding:"10px 20px",background:"#f5576c",color:"#fff",border:"none",borderRadius:10,fontSize:16}},"Reset App")
+        React.createElement("button",{onClick:()=>{if(confirm("⚠️ This will erase your buddy and all progress!\n\nHave you backed up your data?\n(Settings → Backup & Restore → Export)\n\nPress OK to reset.")){ZobuddyDB.remove("zodibuddies_v1");window.location.reload();}},style:{marginTop:8,marginLeft:8,padding:"10px 20px",background:"#f5576c",color:"#fff",border:"none",borderRadius:10,fontSize:16}},"Reset App")
       );
     }
     return this.props.children;
