@@ -7488,7 +7488,7 @@ const NotebookPanel=()=>{
             const getXY2=(e)=>{const r=el.getBoundingClientRect();return{x:(e.clientX-r.left)*el.width/r.width,y:(e.clientY-r.top)*el.height/r.height};};
             let pinching2=false;let lastPinchDist2=0;let lastPinchMidX2=0;let lastPinchMidY2=0;
             let strokeStartedAt2=0;
-            const scrollParent2=()=>{let p=el.parentElement;while(p){if(p.scrollHeight>p.clientHeight||p.scrollWidth>p.clientWidth)return p;p=p.parentElement;}return null;};
+
             el.addEventListener("touchstart",(e)=>{
               if(e.touches.length>=2){
                 if(vecIsDrawing.current&&Date.now()-strokeStartedAt2<200){vecUndoDraw();}
@@ -7527,7 +7527,7 @@ const NotebookPanel=()=>{
                 const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
                 const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
                 if(lastPinchDist2>0){const scale2=dist/lastPinchDist2;setPageZoom(z=>Math.max(0.3,Math.min(6,z*scale2)));}
-                const sp=scrollParent2();
+                const sp=artScrollRef.current;
                 if(sp){sp.scrollLeft-=(midX-lastPinchMidX2);sp.scrollTop-=(midY-lastPinchMidY2);}
                 lastPinchDist2=dist;lastPinchMidX2=midX;lastPinchMidY2=midY;return;}
               if(!vecIsDrawing.current||pinching2)return;e.preventDefault();
@@ -7548,7 +7548,7 @@ const NotebookPanel=()=>{
             const getXY2=(e)=>{const r=el.getBoundingClientRect();return{x:(e.clientX-r.left)*el.width/r.width,y:(e.clientY-r.top)*el.height/r.height};};
             let pinching2=false;let lastPinchDist2=0;let lastPinchMidX2=0;let lastPinchMidY2=0;
             let strokeStartedAt2=0;
-            const scrollParent2=()=>{let p=el.parentElement;while(p){if(p.scrollHeight>p.clientHeight||p.scrollWidth>p.clientWidth)return p;p=p.parentElement;}return null;};
+
             el.addEventListener("touchstart",(e)=>{
               if(e.touches.length>=2){
                 if(vecIsDrawing.current&&Date.now()-strokeStartedAt2<200){vecUndoDraw();}
@@ -7587,7 +7587,7 @@ const NotebookPanel=()=>{
                 const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
                 const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
                 if(lastPinchDist2>0){const scale2=dist/lastPinchDist2;setPageZoom(z=>Math.max(0.3,Math.min(6,z*scale2)));}
-                const sp=scrollParent2();
+                const sp=artScrollRef.current;
                 if(sp){sp.scrollLeft-=(midX-lastPinchMidX2);sp.scrollTop-=(midY-lastPinchMidY2);}
                 lastPinchDist2=dist;lastPinchMidX2=midX;lastPinchMidY2=midY;return;}
               if(!vecIsDrawing.current||pinching2)return;e.preventDefault();
