@@ -1,35 +1,32 @@
 /**
  * Zobuddy Build Script
  * Compiles src/app.jsx (JSX) into a production index.html with pre-compiled JavaScript.
- * No more in-browser Babel — faster loads on all devices.
+ * Uses TypeScript compiler for JSX transformation.
  * 
  * Run: node build.js
- * Requires: npm install (installs @babel/core and @babel/preset-react)
  */
 const fs = require('fs');
 const path = require('path');
-const babel = require('@babel/core');
+const { execSync } = require('child_process');
 
-// Read the JSX source
-const jsxSource = fs.readFileSync(path.join(__dirname, 'src', 'app.jsx'), 'utf-8');
-
-// Compile JSX to plain JavaScript
-console.log('Compiling JSX...');
-const result = babel.transformSync(jsxSource, {
-  presets: [
-    ['@babel/preset-env', { targets: { chrome: '80', safari: '13', firefox: '80' } }],
-    ['@babel/preset-react', { runtime: 'classic' }]
-  ],
-  plugins: [],
-  filename: 'app.jsx',
-});
-
-if (!result || !result.code) {
-  console.error('Babel compilation failed!');
+// Compile JSX to plain JavaScript using TypeScript compiler
+console.log('Compiling JSX with TypeScript...');
+try {
+  execSync('tsc --jsx react --target ES2020 --module ES2020 --allowJs --outDir tmp_out --skipLibCheck --noEmit false --ignoreConfig src/app.jsx', {
+    cwd: __dirname,
+    stdio: 'pipe'
+  });
+} catch (err) {
+  console.error('TypeScript compilation failed!');
+  console.error(err.stderr?.toString() || err.message);
   process.exit(1);
 }
 
+const result = { code: fs.readFileSync(path.join(__dirname, 'tmp_out', 'app.js'), 'utf-8') };
 console.log(`Compiled successfully (${result.code.length} bytes)`);
+
+// Clean up tmp_out
+fs.rmSync(path.join(__dirname, 'tmp_out'), { recursive: true, force: true });
 
 // Build the final index.html — same structure, but with compiled JS instead of JSX+Babel
 const html = `<!DOCTYPE html>
