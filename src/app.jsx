@@ -7063,6 +7063,11 @@ const NotebookPanel=()=>{
   // Save vector draw overlay
   const saveVecDraw=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const d=readNb();const pi=pageIdxRef.current;
     if(d.pages?.[pi]){d.pages[pi].vecDrawData=c.toDataURL("image/png");saveNb(d);}};
+  // Save poly draw overlay (reuses vecDrawCanvas when on a poly page)
+  const savePolyDraw=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const d=readNb();const pi=pageIdxRef.current;
+    if(d.pages?.[pi]){d.pages[pi].polyDrawData=c.toDataURL("image/png");saveNb(d);}};
+  const saveArtDraw=()=>{const d=readNb();const pg=d.pages?.[pageIdxRef.current];if(!pg)return;
+    if(pg.type==="vector")saveVecDraw();else if(pg.type==="poly")savePolyDraw();};
 
 
 
@@ -7213,7 +7218,11 @@ const NotebookPanel=()=>{
     const hasVecContent=artStyle==="vector"&&(vecSvg||vecPng);
     const polyPng=artStyle==="poly"?(page.polyPng||""):"";
     const polyColors=artStyle==="poly"?(page.polyColors||[]):[];
-    const hasArtContent=artStyle==="pixel"||hasVecContent||polyPng;
+    const hasVecDraw=artStyle==="vector"&&(page.vecDrawData||false);
+    const hasPolyDraw=artStyle==="poly"&&(page.polyDrawData||false);
+    const hasAnyVecContent=hasVecContent||hasVecDraw;
+    const hasAnyPolyContent=!!polyPng||hasPolyDraw;
+    const hasArtContent=artStyle==="pixel"||hasAnyVecContent||hasAnyPolyContent;
     // Sort colors by hue for gradient display (shared by all types)
     const artColors=artStyle==="vector"?vecColors:artStyle==="poly"?polyColors:[];
     const sortedColors=(()=>{if(!artColors.length)return[];
@@ -7253,8 +7262,22 @@ const NotebookPanel=()=>{
     // Save PNG handler
     const doSavePng=()=>{
       if(artStyle==="pixel"){const c=pixCanvasRef.current;if(c)saveAsPng(c.toDataURL("image/png"),page.title||"pixel-art");}
-      else if(artStyle==="vector"&&vecPng)saveAsPng(vecPng,page.title||"flat-art");
-      else if(artStyle==="poly"&&polyPng)saveAsPng(polyPng,page.title||"poly-art");
+      else if(artStyle==="vector"){
+        if(vecPng){
+          // Composite converted image + draw overlay
+          const dc=vecDrawCanvasRef.current;
+          if(dc){const comp=document.createElement("canvas");comp.width=vecImgW;comp.height=vecImgH;const cctx=comp.getContext("2d");
+            const bg=new Image();bg.onload=()=>{cctx.drawImage(bg,0,0);cctx.drawImage(dc,0,0,comp.width,comp.height);saveAsPng(comp.toDataURL("image/png"),page.title||"flat-art");};bg.src=vecPng;}
+          else saveAsPng(vecPng,page.title||"flat-art");
+        } else {const dc=vecDrawCanvasRef.current;if(dc)saveAsPng(dc.toDataURL("image/png"),page.title||"flat-art");}
+      }
+      else if(artStyle==="poly"){
+        if(polyPng){
+          const dc=vecDrawCanvasRef.current;
+          if(dc){const comp=document.createElement("canvas");const bg=new Image();bg.onload=()=>{comp.width=bg.width;comp.height=bg.height;const cctx=comp.getContext("2d");cctx.drawImage(bg,0,0);cctx.drawImage(dc,0,0,comp.width,comp.height);saveAsPng(comp.toDataURL("image/png"),page.title||"poly-art");};bg.src=polyPng;}
+          else saveAsPng(polyPng,page.title||"poly-art");
+        } else {const dc=vecDrawCanvasRef.current;if(dc)saveAsPng(dc.toDataURL("image/png"),page.title||"poly-art");}
+      }
     };
     // Is currently importing
     const isConverting=artStyle==="pixel"?pixImporting:artStyle==="vector"?vecImporting:polyImporting;
@@ -7425,14 +7448,14 @@ const NotebookPanel=()=>{
         {artStyle==="pixel"&&<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
           <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"none",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
         </div>}
-        {artStyle==="vector"&&(hasVecContent?<div style={{position:"relative",display:"inline-block"}}>
-          <img src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
+        {artStyle==="vector"&&<div style={{position:"relative",display:"inline-block",minWidth:hasVecContent?undefined:300,minHeight:hasVecContent?undefined:300}}>
+          {hasVecContent&&<img src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
             const img2=e.target;const nw=img2.naturalWidth,nh=img2.naturalHeight;
             if(nw&&nh&&(nw!==vecImgW||nh!==vecImgH)){setVecImgW(nw);setVecImgH(nh);}
-          }}/>
+          }}/>}
           {page.vectorOriginal&&vecOrigOpacity>0&&<img src={page.vectorOriginal} style={{position:"absolute",inset:0,width:"100%",height:"100%",opacity:vecOrigOpacity,pointerEvents:"none",mixBlendMode:"normal"}}/>}
           {/* Square grid overlay */}
-          {vecGrid>0&&(()=>{
+          {hasVecContent&&vecGrid>0&&(()=>{
             const natW=vecImgW,natH=vecImgH;
             const cellSize2=Math.min(natW,natH)/vecGrid;
             const cols2=Math.floor(natW/cellSize2),rows2=Math.floor(natH/cellSize2);
@@ -7450,7 +7473,7 @@ const NotebookPanel=()=>{
               </>}
             </svg>;
           })()}
-          {/* Draw overlay canvas */}
+          {/* Draw overlay canvas — always available for freehand drawing */}
           <canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
             const d3=readNb();const dd=d3.pages?.[pageIdxRef.current]?.vecDrawData;
             if(dd){const img3=new Image();img3.onload=()=>{el.getContext("2d").drawImage(img3,0,0);vecPushHistory();};img3.src=dd;}else{vecPushHistory();}
@@ -7504,21 +7527,70 @@ const NotebookPanel=()=>{
             },{passive:false});
             el.addEventListener("touchend",(e)=>{
               if(e.touches.length<2){pinching2=false;lastPinchDist2=0;}
-              if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveVecDraw();}
+              if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveArtDraw();}
             });
-          }}} width={800} height={800} style={{position:"absolute",inset:0,width:"100%",height:"100%",touchAction:"none",cursor:vecEyedropper?"crosshair":"default"}}/>
-        </div>
-        :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
-          <div style={{fontSize:48,marginBottom:12}}>🎨</div>
-          <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert</div>
-          <div style={{fontSize:12,marginTop:4}}>Choose a color count above and select an image</div>
-        </div>)}
-        {artStyle==="poly"&&(polyPng?<img src={polyPng} style={{transform:`scale(${pageZoom})`,transformOrigin:"top center",maxWidth:"100%",height:"auto"}}/>
-        :<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,opacity:.3}}>
-          <div style={{fontSize:48,marginBottom:12}}>🔷</div>
-          <div style={{fontSize:14,fontWeight:700}}>Upload an image to convert to poly art</div>
-          <div style={{fontSize:12,marginTop:4}}>Set density and color count, then select an image</div>
-        </div>)}
+          }}} width={800} height={800} style={{position:hasVecContent?"absolute":"relative",inset:hasVecContent?0:undefined,width:hasVecContent?"100%":800*pageZoom,height:hasVecContent?"100%":800*pageZoom,touchAction:"none",cursor:vecEyedropper?"crosshair":"default",background:hasVecContent?"transparent":"rgba(255,255,255,.03)",borderRadius:hasVecContent?0:8,border:hasVecContent?"none":"1px solid rgba(255,255,255,.08)"}}/>
+        </div>}
+        {artStyle==="poly"&&<div style={{position:"relative",display:"inline-block",minWidth:polyPng?undefined:300,minHeight:polyPng?undefined:300}}>
+          {polyPng&&<img src={polyPng} style={{display:"block",width:"auto",height:"auto",maxWidth:"100%",transform:`scale(${pageZoom})`,transformOrigin:"top center"}}/>}
+          {/* Draw overlay canvas for poly — freehand drawing with or without converted image */}
+          <canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
+            const d3=readNb();const dd=d3.pages?.[pageIdxRef.current]?.polyDrawData;
+            if(dd){const img3=new Image();img3.onload=()=>{el.getContext("2d").drawImage(img3,0,0);vecPushHistory();};img3.src=dd;}else{vecPushHistory();}
+            const getXY2=(e)=>{const r=el.getBoundingClientRect();return{x:(e.clientX-r.left)*el.width/r.width,y:(e.clientY-r.top)*el.height/r.height};};
+            let pinching2=false;let lastPinchDist2=0;let lastPinchMidX2=0;let lastPinchMidY2=0;
+            let strokeStartedAt2=0;
+            const scrollParent2=()=>{let p=el.parentElement;while(p){if(p.scrollHeight>p.clientHeight||p.scrollWidth>p.clientWidth)return p;p=p.parentElement;}return null;};
+            el.addEventListener("touchstart",(e)=>{
+              if(e.touches.length>=2){
+                if(vecIsDrawing.current&&Date.now()-strokeStartedAt2<200){vecUndoDraw();}
+                vecIsDrawing.current=false;pinching2=true;
+                const dx2=e.touches[0].clientX-e.touches[1].clientX,dy2=e.touches[0].clientY-e.touches[1].clientY;
+                lastPinchDist2=Math.sqrt(dx2*dx2+dy2*dy2);
+                lastPinchMidX2=(e.touches[0].clientX+e.touches[1].clientX)/2;
+                lastPinchMidY2=(e.touches[0].clientY+e.touches[1].clientY)/2;
+                e.preventDefault();return;}
+              if(e.touches.length===1&&!pinching2){
+                e.preventDefault();const p=getXY2(e.touches[0]);
+                if(vecEyedropperRef.current){
+                  const baseImg=el.parentElement?.querySelector("img");if(baseImg){
+                    const tc2=document.createElement("canvas");tc2.width=baseImg.naturalWidth||800;tc2.height=baseImg.naturalHeight||800;
+                    tc2.getContext("2d").drawImage(baseImg,0,0,tc2.width,tc2.height);
+                    const ix=Math.floor(p.x*tc2.width/el.width),iy=Math.floor(p.y*tc2.height/el.height);
+                    const px2=tc2.getContext("2d").getImageData(ix,iy,1,1).data;
+                    setVecDrawColor("#"+[px2[0],px2[1],px2[2]].map(v=>v.toString(16).padStart(2,"0")).join(""));setVecEyedropper(false);
+                  }return;}
+                vecPushHistory();strokeStartedAt2=Date.now();
+                vecIsDrawing.current=true;const ctx=el.getContext("2d");
+                const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
+                if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
+                else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
+                ctx.lineCap="round";ctx.lineJoin="round";
+                ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);
+              }
+            },{passive:false});
+            el.addEventListener("touchmove",(e)=>{
+              if(e.touches.length>=2){
+                if(vecIsDrawing.current&&Date.now()-strokeStartedAt2<200){vecUndoDraw();}
+                vecIsDrawing.current=false;pinching2=true;
+                e.preventDefault();
+                const dx2=e.touches[0].clientX-e.touches[1].clientX,dy2=e.touches[0].clientY-e.touches[1].clientY;
+                const dist=Math.sqrt(dx2*dx2+dy2*dy2);
+                const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+                const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+                if(lastPinchDist2>0){const scale2=dist/lastPinchDist2;setPageZoom(z=>Math.max(0.3,Math.min(6,z*scale2)));}
+                const sp=scrollParent2();
+                if(sp){sp.scrollLeft-=(midX-lastPinchMidX2);sp.scrollTop-=(midY-lastPinchMidY2);}
+                lastPinchDist2=dist;lastPinchMidX2=midX;lastPinchMidY2=midY;return;}
+              if(!vecIsDrawing.current||pinching2)return;e.preventDefault();
+              const p=getXY2(e.touches[0]);const ctx=el.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke();
+            },{passive:false});
+            el.addEventListener("touchend",(e)=>{
+              if(e.touches.length<2){pinching2=false;lastPinchDist2=0;}
+              if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();savePolyDraw();}
+            });
+          }}} width={800} height={800} style={{position:polyPng?"absolute":"relative",inset:polyPng?0:undefined,width:polyPng?"100%":800*pageZoom,height:polyPng?"100%":800*pageZoom,touchAction:"none",cursor:vecEyedropper?"crosshair":"default",background:polyPng?"transparent":"rgba(255,255,255,.03)",borderRadius:polyPng?0:8,border:polyPng?"none":"1px solid rgba(255,255,255,.08)"}}/>
+        </div>}
       </div>
 
       {/* === BOTTOM: Color palette + Draw tools + Zoom + Actions (thumb zone) === */}
@@ -7538,13 +7610,16 @@ const NotebookPanel=()=>{
             <button onClick={()=>{setShowPixPicker(v=>!v);setPixPaletteSearch("");}} style={tbtn({padding:"6px 10px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>{showPixPicker?"▼":"🎨"}</button>
           </>}
           {(artStyle==="vector"||artStyle==="poly")&&<>
-            {(vecPalExpanded?sortedColors:sortedColors.slice(0,10)).map((c,i)=><div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);setVecEyedropper(false);}}
+            <button onClick={()=>{setVecEyedropper(false);setVecDrawEraser(e=>!e);}} style={tbtn(vecDrawEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",padding:"6px 10px"}:{color:"#ccc",padding:"6px 10px"})}>
+              {vecDrawEraser?<span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span>:"✏️"}</button>
+            <div style={{width:1,height:24,background:"rgba(255,255,255,.1)"}}/>
+            {(vecPalExpanded?sortedColors:sortedColors.slice(0,8)).map((c,i)=><div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);setVecEyedropper(false);}}
               style={cSwatch(c.color,vecDrawColor===c.color&&!vecDrawEraser,28)}/>)}
-            {sortedColors.length>10&&!vecPalExpanded&&<button onClick={()=>setVecPalExpanded(true)}
-              style={tbtn({padding:"4px 8px",fontSize:10,color:"#999"})}>+{sortedColors.length-10}</button>}
-            {vecPalExpanded&&sortedColors.length>10&&<button onClick={()=>setVecPalExpanded(false)}
+            {sortedColors.length>8&&!vecPalExpanded&&<button onClick={()=>setVecPalExpanded(true)}
+              style={tbtn({padding:"4px 8px",fontSize:10,color:"#999"})}>+{sortedColors.length-8}</button>}
+            {vecPalExpanded&&sortedColors.length>8&&<button onClick={()=>setVecPalExpanded(false)}
               style={tbtn({padding:"4px 8px",fontSize:10,color:"#feca57"})}>▲</button>}
-            {artColors.length===0&&["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
+            {artColors.length===0&&["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313","#5C184E","#feca57","#8C8C8C"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
               style={cSwatch(c,vecDrawColor===c&&!vecDrawEraser,28)}/>)}
           </>}
         </div>
@@ -7590,7 +7665,7 @@ const NotebookPanel=()=>{
           <button onClick={undoPixel} style={tbtn({color:"#aaa"})}>↩</button>
           <button onClick={redoPixel} style={tbtn({color:"#aaa"})}>↪</button>
         </>}
-        {artStyle==="vector"&&hasVecContent&&<>
+        {(artStyle==="vector"||artStyle==="poly")&&<>
           <button onClick={vecUndoDraw} style={tbtn({color:"#aaa"})}>↩</button>
           <button onClick={vecRedoDraw} style={tbtn({color:"#aaa"})}>↪</button>
           <button onClick={()=>{setVecDrawEraser(false);setVecEyedropper(e=>!e);}} style={tbtn(vecEyedropper?{background:"rgba(67,233,123,.2)",border:"1px solid rgba(67,233,123,.4)",color:"#43e97b"}:{color:"#888"})}>💧</button>
@@ -7606,7 +7681,7 @@ const NotebookPanel=()=>{
           {[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
             <button key={g.v} onClick={()=>setPixelGridLines(g.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:pixelGridLines===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:pixelGridLines===g.v?"rgba(254,202,87,.12)":"transparent",color:pixelGridLines===g.v?"#feca57":"#666",cursor:"pointer"}}>{g.l}</button>))}
         </>}
-        {artStyle==="vector"&&hasVecContent&&<>
+        {artStyle==="vector"&&<>
           <div style={{width:1,height:24,background:"rgba(255,255,255,.08)"}}/>
           <span style={{fontSize:10,opacity:.3,fontWeight:700}}>Grid:</span>
           {[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
@@ -7621,6 +7696,8 @@ const NotebookPanel=()=>{
         <button onClick={()=>setPageZoom(z=>Math.min(6,z+0.2))} style={tbtn({padding:"6px 10px"})}>+</button>
         <div style={{flex:1}}/>
         {artStyle==="pixel"&&<button onClick={()=>{if(!confirm("Clear all pixels?"))return;const d2=readNb();if(d2.pages?.[nbPageIdx]){d2.pages[nbPageIdx].pixels={};writeNb(d2);drawPixelGrid();}}}
+          style={tbtn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:12})}>🗑 Clear</button>}
+        {(artStyle==="vector"||artStyle==="poly")&&<button onClick={()=>{if(!confirm("Clear drawing?"))return;const dc=vecDrawCanvasRef.current;if(dc){dc.getContext("2d").clearRect(0,0,dc.width,dc.height);vecPushHistory();saveArtDraw();}}}
           style={tbtn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:12})}>🗑 Clear</button>}
         <button onClick={doSave} style={tbtn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",fontSize:12}:{color:"#888",fontSize:12})}>{saved?"✓":"💾"}</button>
         <button onClick={doArtPrint} style={tbtn({color:"#888",fontSize:12})}>🖨</button>
