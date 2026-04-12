@@ -6941,6 +6941,261 @@ const NotebookPanel=()=>{
     </div>);
 
   // ═══ PIXEL PAGE ═══
+  // ═══ VECTOR ART ENGINE ═══
+  // ═══ VECTOR ART ENGINE — paint-by-number posterizer ═══
+  const traceImageToSvg=(imgSrc,colorCount,callback)=>{
+    const img=new Image();
+    img.onerror=()=>{alert("Failed to load image");callback(null);};
+    img.onload=()=>{
+      try{
+      // Work at 2x for quality, display at 1x
+      const maxDim=800;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      // Step 1: Blur to smooth out noise
+      const tc=document.createElement("canvas");tc.width=w;tc.height=h;
+      const tctx=tc.getContext("2d");
+      tctx.filter="blur(2px)";tctx.drawImage(img,0,0,w,h);tctx.filter="none";
+      const data=tctx.getImageData(0,0,w,h).data;
+      const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+      const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
+      const nearFull=(r,g,b)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
+      // Step 2: Quantize
+      const grid=new Uint16Array(w*h);const votes=new Map();
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const idx=(y*w+x)*4;if(data[idx+3]<30){grid[y*w+x]=65535;continue;}
+        const bi=nearFull(data[idx],data[idx+1],data[idx+2]);grid[y*w+x]=bi;votes.set(bi,(votes.get(bi)||0)+1);
+      }
+      const topN=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,colorCount===0?votes.size:colorCount);
+      const allowedSet=new Set(topN.map(e=>e[0]));
+      const remap=new Uint16Array(fullPal.length);
+      for(let i=0;i<fullPal.length;i++){
+        if(allowedSet.has(i)){remap[i]=i;continue;}
+        let bd=Infinity,bi=topN[0][0];const[r,g,b]=fullRgb[i];
+        topN.forEach(([ci])=>{const[pr,pg,pb]=fullRgb[ci];const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=ci;}});
+        remap[i]=bi;
+      }
+      for(let i=0;i<grid.length;i++){if(grid[i]!==65535)grid[i]=remap[grid[i]];}
+      // Step 3: Mode filter (5 passes for very clean regions)
+      const clean=new Uint16Array(w*h);
+      for(let pass=0;pass<5;pass++){
+        const src=pass===0?grid:clean;
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+          const counts=new Map();
+          for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+            const ny=y+dy,nx=x+dx;
+            if(ny>=0&&ny<h&&nx>=0&&nx<w){const v=src[ny*w+nx];if(v!==65535)counts.set(v,(counts.get(v)||0)+1);}
+          }
+          let best=src[y*w+x],bestC=0;
+          counts.forEach((c,v)=>{if(c>bestC){bestC=c;best=v;}});
+          clean[y*w+x]=best;
+        }
+        if(pass<4)for(let i=0;i<w*h;i++)grid[i]=clean[i];
+      }
+      // Step 4: Render to canvas as a clean image
+      const outCanvas=document.createElement("canvas");outCanvas.width=w;outCanvas.height=h;
+      const octx=outCanvas.getContext("2d");
+      const imgData=octx.createImageData(w,h);
+      for(let i=0;i<w*h;i++){
+        const ci=clean[i];
+        if(ci===65535||ci>=fullRgb.length){imgData.data[i*4+3]=0;continue;}
+        const[r,g,b]=fullRgb[ci];
+        imgData.data[i*4]=r;imgData.data[i*4+1]=g;imgData.data[i*4+2]=b;imgData.data[i*4+3]=255;
+      }
+      octx.putImageData(imgData,0,0);
+      const pngUrl=outCanvas.toDataURL("image/png");
+      // Build simple SVG as well (for SVG export) using larger rects
+      let svgPaths="";
+      const usedColors=[...new Set(Array.from(clean).filter(v=>v!==65535))];
+      usedColors.sort((a,b)=>{const va=votes.get(a)||0,vb=votes.get(b)||0;return vb-va;});
+      const gridCopy=new Uint16Array(clean);
+      usedColors.forEach(ci=>{
+        for(let y=0;y<h;y++){let x=0;
+          while(x<w){
+            if(gridCopy[y*w+x]===ci){
+              let xe=x+1;while(xe<w&&gridCopy[y*w+xe]===ci)xe++;
+              let ye=y+1;
+              outer:while(ye<h){for(let xx=x;xx<xe;xx++){if(gridCopy[ye*w+xx]!==ci)break outer;}ye++;}
+              for(let yy=y;yy<ye;yy++)for(let xx=x;xx<xe;xx++)gridCopy[yy*w+xx]=65534;
+              svgPaths+=`<rect x="${x}" y="${y}" width="${xe-x}" height="${ye-y}" fill="${fullPal[ci]}"/>`;
+              x=xe;
+            }else x++;
+          }
+        }
+      });
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${svgPaths}</svg>`;
+      // Color info
+      const finalVotes=new Map();
+      for(let i=0;i<clean.length;i++){const v=clean[i];if(v!==65535)finalVotes.set(v,(finalVotes.get(v)||0)+1);}
+      const colorInfo=[...finalVotes.entries()].sort((a,b)=>b[1]-a[1]).map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
+      callback({svg,width:w,height:h,colors:colorInfo,pngUrl});
+      }catch(err){alert("Error: "+err.message);callback(null);}
+    };img.src=imgSrc;
+  };
+  const vecSvgRef=React.useRef("");
+  const vecConvert=(paletteLimit)=>{
+    vecPendingLimit.current=paletteLimit;
+    vecFileRef.current?.click();
+    const input=vecFileRef.current;
+    if(input){input.onchange=(e)=>{
+      const file=e.target.files?.[0];if(!file)return;e.target.value="";
+      const reader=new FileReader();reader.onload=(ev)=>{
+        setVecCropBox({x:0,y:0,w:100,h:100});setVecCropImg(ev.target.result);
+      };reader.readAsDataURL(file);
+    };}
+  };
+  const vecConfirmCrop=()=>{
+    if(!vecCropImg)return;setVecImporting(true);
+    const src=vecCropImg;setVecCropImg(null);
+    const ci2=new Image();ci2.onload=()=>{
+      const bx=Math.round(ci2.width*vecCropBox.x/100),by=Math.round(ci2.height*vecCropBox.y/100);
+      const bw=Math.max(1,Math.round(ci2.width*vecCropBox.w/100)),bh=Math.max(1,Math.round(ci2.height*vecCropBox.h/100));
+      const cc=document.createElement("canvas");cc.width=bw;cc.height=bh;
+      cc.getContext("2d").drawImage(ci2,bx,by,bw,bh,0,0,bw,bh);
+      traceImageToSvg(cc.toDataURL("image/png"),vecPendingLimit.current,(result)=>{
+        setVecImporting(false);if(!result)return;
+        vecSvgRef.current=result.svg;
+        const d=readNb();const pi=pageIdxRef.current;
+        if(d.pages?.[pi]){d.pages[pi].vectorPng=result.pngUrl||"";d.pages[pi].vectorColors=result.colors;d.pages[pi].vecDrawData=null;d.pages[pi].vectorOriginal=cc.toDataURL("image/png");delete d.pages[pi].vectorSvg;
+          try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
+      });
+    };ci2.src=src;
+  };
+  // Save vector draw overlay
+  const saveVecDraw=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const d=readNb();const pi=pageIdxRef.current;
+    if(d.pages?.[pi]){d.pages[pi].vecDrawData=c.toDataURL("image/png");saveNb(d);}};
+
+
+
+  // ═══ POLY ART ENGINE — grid-jittered triangulation ═══
+  const generatePolyArt=(imgSrc,numPoints,colorCount,callback)=>{
+    const img=new Image();img.onerror=()=>{alert("Failed to load image");callback(null);};
+    img.onload=()=>{
+      try{
+      const maxDim=800;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      const tc=document.createElement("canvas");tc.width=w;tc.height=h;
+      const tctx=tc.getContext("2d");tctx.drawImage(img,0,0,w,h);
+      const data=tctx.getImageData(0,0,w,h).data;
+      // Edge detection for adaptive point density
+      const gray=new Float32Array(w*h);
+      for(let i=0;i<w*h;i++)gray[i]=(data[i*4]*0.299+data[i*4+1]*0.587+data[i*4+2]*0.114)/255;
+      const edges=new Float32Array(w*h);
+      for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+        const gx=gray[(y-1)*w+x+1]-gray[(y-1)*w+x-1]+2*(gray[y*w+x+1]-gray[y*w+x-1])+gray[(y+1)*w+x+1]-gray[(y+1)*w+x-1];
+        const gy=gray[(y+1)*w+x-1]-gray[(y-1)*w+x-1]+2*(gray[(y+1)*w+x]-gray[(y-1)*w+x])+gray[(y+1)*w+x+1]-gray[(y-1)*w+x+1];
+        edges[y*w+x]=Math.sqrt(gx*gx+gy*gy);
+      }
+      // Generate points on a jittered grid, denser near edges
+      const cellSize=Math.sqrt(w*h/numPoints);
+      const cols=Math.ceil(w/cellSize),rows=Math.ceil(h/cellSize);
+      const pts=[];
+      // Border points for clean edges
+      for(let i=0;i<=cols;i++){pts.push({x:i*cellSize,y:0});pts.push({x:i*cellSize,y:h});}
+      for(let i=1;i<rows;i++){pts.push({x:0,y:i*cellSize});pts.push({x:w,y:i*cellSize});}
+      // Interior points
+      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+        const cx=c*cellSize+cellSize/2,cy=r*cellSize+cellSize/2;
+        const ix=Math.min(w-1,Math.floor(cx)),iy=Math.min(h-1,Math.floor(cy));
+        const edgeVal=edges[iy*w+ix];
+        // Add main point with jitter
+        const jitter=cellSize*0.4;
+        pts.push({x:cx+(Math.random()-0.5)*jitter,y:cy+(Math.random()-0.5)*jitter});
+        // Add extra point near edges
+        if(edgeVal>0.15){
+          pts.push({x:cx+(Math.random()-0.5)*jitter*0.5,y:cy+(Math.random()-0.5)*jitter*0.5});
+        }
+      }
+      // Clamp points
+      pts.forEach(p=>{p.x=Math.max(0,Math.min(w,p.x));p.y=Math.max(0,Math.min(h,p.y));});
+      // Simple Delaunay via incremental ear-clipping-like approach
+      // Use a fast O(n log n) sweep approach: sort by x, build triangulation
+      // Actually use a simpler approach: for each grid cell, create 2 triangles, then relax
+      const tris=[];
+      // Create triangulation from points using a simple approach:
+      // Sort points, then do a fan triangulation from nearest neighbors
+      // Better: use grid-based triangulation which is guaranteed to work
+      const gridW=cols+1,gridH=rows+1;
+      const gridPts=[];
+      // Create a regular grid of points first
+      for(let r=0;r<=rows;r++)for(let c=0;c<=cols;c++){
+        const x=Math.min(w,c*cellSize),y=Math.min(h,r*cellSize);
+        const jitter=cellSize*0.35;
+        const ix=Math.min(w-1,Math.floor(x)),iy=Math.min(h-1,Math.floor(y));
+        const edgeVal=(ix>0&&iy>0&&ix<w-1&&iy<h-1)?edges[iy*w+ix]:0;
+        const j=edgeVal>0.15?jitter*0.3:jitter;
+        // Don't jitter border points
+        const isBorder=r===0||r===rows||c===0||c===cols;
+        gridPts.push({
+          x:isBorder?x:x+(Math.random()-0.5)*j*2,
+          y:isBorder?y:y+(Math.random()-0.5)*j*2
+        });
+      }
+      // Create triangles from grid (2 triangles per cell)
+      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+        const tl=r*gridW+c,tr=tl+1,bl=(r+1)*gridW+c,br=bl+1;
+        if(Math.random()<0.5){tris.push({a:tl,b:tr,c:bl});tris.push({a:tr,b:br,c:bl});}
+        else{tris.push({a:tl,b:tr,c:br});tris.push({a:tl,b:br,c:bl});}
+      }
+      // Color each triangle
+      const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+      const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
+      const nearFull=(r2,g2,b2)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r2-pr)**2+(g2-pg)**2+(b2-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
+      const outCanvas=document.createElement("canvas");outCanvas.width=w;outCanvas.height=h;
+      const octx=outCanvas.getContext("2d");
+      const votes=new Map();
+      tris.forEach(t=>{
+        const pa=gridPts[t.a],pb=gridPts[t.b],pc=gridPts[t.c];
+        const cx2=(pa.x+pb.x+pc.x)/3,cy2=(pa.y+pb.y+pc.y)/3;
+        // Sample multiple points inside triangle for better color
+        let sr=0,sg=0,sb=0,sc=0;
+        for(let s=0;s<5;s++){
+          const r1=Math.random(),r2s=Math.random();
+          const sq=Math.sqrt(r1);
+          const sx=(1-sq)*pa.x+sq*(1-r2s)*pb.x+sq*r2s*pc.x;
+          const sy=(1-sq)*pa.y+sq*(1-r2s)*pb.y+sq*r2s*pc.y;
+          const ix=Math.max(0,Math.min(w-1,Math.floor(sx))),iy=Math.max(0,Math.min(h-1,Math.floor(sy)));
+          const idx=(iy*w+ix)*4;sr+=data[idx];sg+=data[idx+1];sb+=data[idx+2];sc++;
+        }
+        if(sc===0)return;sr/=sc;sg/=sc;sb/=sc;
+        const ci=nearFull(sr,sg,sb);votes.set(ci,(votes.get(ci)||0)+1);
+        octx.fillStyle=fullPal[ci];octx.strokeStyle=fullPal[ci];octx.lineWidth=0.5;octx.lineJoin="round";
+        octx.beginPath();octx.moveTo(pa.x,pa.y);octx.lineTo(pb.x,pb.y);octx.lineTo(pc.x,pc.y);octx.closePath();octx.fill();octx.stroke();
+      });
+      const pngUrl=outCanvas.toDataURL("image/png");
+      const topColors=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,colorCount===0?votes.size:colorCount);
+      const colorInfo=topColors.map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
+      callback({pngUrl,width:w,height:h,colors:colorInfo});
+      }catch(err){alert("Error: "+err.message);callback(null);}
+    };img.src=imgSrc;
+  };
+  const polyConvert=(colorCount)=>{
+    polyPendingColors.current=colorCount;
+    polyFileRef.current?.click();
+    const input=polyFileRef.current;
+    if(input){input.onchange=(e)=>{
+      const file=e.target.files?.[0];if(!file)return;e.target.value="";
+      const reader=new FileReader();reader.onload=(ev)=>{
+        setPolyCropBox({x:0,y:0,w:100,h:100});setPolyCropImg(ev.target.result);
+      };reader.readAsDataURL(file);
+    };}
+  };
+  const polyConfirmCrop=()=>{
+    if(!polyCropImg)return;setPolyImporting(true);
+    const src=polyCropImg;setPolyCropImg(null);
+    const ci2=new Image();ci2.onload=()=>{
+      const bx=Math.round(ci2.width*polyCropBox.x/100),by=Math.round(ci2.height*polyCropBox.y/100);
+      const bw=Math.max(1,Math.round(ci2.width*polyCropBox.w/100)),bh=Math.max(1,Math.round(ci2.height*polyCropBox.h/100));
+      const cc=document.createElement("canvas");cc.width=bw;cc.height=bh;
+      cc.getContext("2d").drawImage(ci2,bx,by,bw,bh,0,0,bw,bh);
+      generatePolyArt(cc.toDataURL("image/png"),polyDensity,polyPendingColors.current,(result)=>{
+        setPolyImporting(false);if(!result)return;
+        const d=readNb();const pi=pageIdxRef.current;
+        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;
+          try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
+      });
+    };ci2.src=src;
+  };
+
   // ═══ UNIFIED ART EDITOR ═══
   // Handles pixel, vector (flat), and poly art in one consistent layout
   if(nbView==="page"&&(nbData.pages[nbPageIdx]?.type==="pixel"||nbData.pages[nbPageIdx]?.type==="vector"||nbData.pages[nbPageIdx]?.type==="poly")){
@@ -7375,260 +7630,7 @@ const NotebookPanel=()=>{
       </div>
     </div>);
   }
-  // ═══ VECTOR ART ENGINE ═══
-  // ═══ VECTOR ART ENGINE — paint-by-number posterizer ═══
-  const traceImageToSvg=(imgSrc,colorCount,callback)=>{
-    const img=new Image();
-    img.onerror=()=>{alert("Failed to load image");callback(null);};
-    img.onload=()=>{
-      try{
-      // Work at 2x for quality, display at 1x
-      const maxDim=800;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
-      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
-      // Step 1: Blur to smooth out noise
-      const tc=document.createElement("canvas");tc.width=w;tc.height=h;
-      const tctx=tc.getContext("2d");
-      tctx.filter="blur(2px)";tctx.drawImage(img,0,0,w,h);tctx.filter="none";
-      const data=tctx.getImageData(0,0,w,h).data;
-      const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
-      const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
-      const nearFull=(r,g,b)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
-      // Step 2: Quantize
-      const grid=new Uint16Array(w*h);const votes=new Map();
-      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-        const idx=(y*w+x)*4;if(data[idx+3]<30){grid[y*w+x]=65535;continue;}
-        const bi=nearFull(data[idx],data[idx+1],data[idx+2]);grid[y*w+x]=bi;votes.set(bi,(votes.get(bi)||0)+1);
-      }
-      const topN=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,colorCount===0?votes.size:colorCount);
-      const allowedSet=new Set(topN.map(e=>e[0]));
-      const remap=new Uint16Array(fullPal.length);
-      for(let i=0;i<fullPal.length;i++){
-        if(allowedSet.has(i)){remap[i]=i;continue;}
-        let bd=Infinity,bi=topN[0][0];const[r,g,b]=fullRgb[i];
-        topN.forEach(([ci])=>{const[pr,pg,pb]=fullRgb[ci];const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=ci;}});
-        remap[i]=bi;
-      }
-      for(let i=0;i<grid.length;i++){if(grid[i]!==65535)grid[i]=remap[grid[i]];}
-      // Step 3: Mode filter (5 passes for very clean regions)
-      const clean=new Uint16Array(w*h);
-      for(let pass=0;pass<5;pass++){
-        const src=pass===0?grid:clean;
-        for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-          const counts=new Map();
-          for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
-            const ny=y+dy,nx=x+dx;
-            if(ny>=0&&ny<h&&nx>=0&&nx<w){const v=src[ny*w+nx];if(v!==65535)counts.set(v,(counts.get(v)||0)+1);}
-          }
-          let best=src[y*w+x],bestC=0;
-          counts.forEach((c,v)=>{if(c>bestC){bestC=c;best=v;}});
-          clean[y*w+x]=best;
-        }
-        if(pass<4)for(let i=0;i<w*h;i++)grid[i]=clean[i];
-      }
-      // Step 4: Render to canvas as a clean image
-      const outCanvas=document.createElement("canvas");outCanvas.width=w;outCanvas.height=h;
-      const octx=outCanvas.getContext("2d");
-      const imgData=octx.createImageData(w,h);
-      for(let i=0;i<w*h;i++){
-        const ci=clean[i];
-        if(ci===65535||ci>=fullRgb.length){imgData.data[i*4+3]=0;continue;}
-        const[r,g,b]=fullRgb[ci];
-        imgData.data[i*4]=r;imgData.data[i*4+1]=g;imgData.data[i*4+2]=b;imgData.data[i*4+3]=255;
-      }
-      octx.putImageData(imgData,0,0);
-      const pngUrl=outCanvas.toDataURL("image/png");
-      // Build simple SVG as well (for SVG export) using larger rects
-      let svgPaths="";
-      const usedColors=[...new Set(Array.from(clean).filter(v=>v!==65535))];
-      usedColors.sort((a,b)=>{const va=votes.get(a)||0,vb=votes.get(b)||0;return vb-va;});
-      const gridCopy=new Uint16Array(clean);
-      usedColors.forEach(ci=>{
-        for(let y=0;y<h;y++){let x=0;
-          while(x<w){
-            if(gridCopy[y*w+x]===ci){
-              let xe=x+1;while(xe<w&&gridCopy[y*w+xe]===ci)xe++;
-              let ye=y+1;
-              outer:while(ye<h){for(let xx=x;xx<xe;xx++){if(gridCopy[ye*w+xx]!==ci)break outer;}ye++;}
-              for(let yy=y;yy<ye;yy++)for(let xx=x;xx<xe;xx++)gridCopy[yy*w+xx]=65534;
-              svgPaths+=`<rect x="${x}" y="${y}" width="${xe-x}" height="${ye-y}" fill="${fullPal[ci]}"/>`;
-              x=xe;
-            }else x++;
-          }
-        }
-      });
-      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${svgPaths}</svg>`;
-      // Color info
-      const finalVotes=new Map();
-      for(let i=0;i<clean.length;i++){const v=clean[i];if(v!==65535)finalVotes.set(v,(finalVotes.get(v)||0)+1);}
-      const colorInfo=[...finalVotes.entries()].sort((a,b)=>b[1]-a[1]).map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
-      callback({svg,width:w,height:h,colors:colorInfo,pngUrl});
-      }catch(err){alert("Error: "+err.message);callback(null);}
-    };img.src=imgSrc;
-  };
-  const vecSvgRef=React.useRef("");
-  const vecConvert=(paletteLimit)=>{
-    vecPendingLimit.current=paletteLimit;
-    vecFileRef.current?.click();
-    const input=vecFileRef.current;
-    if(input){input.onchange=(e)=>{
-      const file=e.target.files?.[0];if(!file)return;e.target.value="";
-      const reader=new FileReader();reader.onload=(ev)=>{
-        setVecCropBox({x:0,y:0,w:100,h:100});setVecCropImg(ev.target.result);
-      };reader.readAsDataURL(file);
-    };}
-  };
-  const vecConfirmCrop=()=>{
-    if(!vecCropImg)return;setVecImporting(true);
-    const src=vecCropImg;setVecCropImg(null);
-    const ci2=new Image();ci2.onload=()=>{
-      const bx=Math.round(ci2.width*vecCropBox.x/100),by=Math.round(ci2.height*vecCropBox.y/100);
-      const bw=Math.max(1,Math.round(ci2.width*vecCropBox.w/100)),bh=Math.max(1,Math.round(ci2.height*vecCropBox.h/100));
-      const cc=document.createElement("canvas");cc.width=bw;cc.height=bh;
-      cc.getContext("2d").drawImage(ci2,bx,by,bw,bh,0,0,bw,bh);
-      traceImageToSvg(cc.toDataURL("image/png"),vecPendingLimit.current,(result)=>{
-        setVecImporting(false);if(!result)return;
-        vecSvgRef.current=result.svg;
-        const d=readNb();const pi=pageIdxRef.current;
-        if(d.pages?.[pi]){d.pages[pi].vectorPng=result.pngUrl||"";d.pages[pi].vectorColors=result.colors;d.pages[pi].vecDrawData=null;d.pages[pi].vectorOriginal=cc.toDataURL("image/png");delete d.pages[pi].vectorSvg;
-          try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
-      });
-    };ci2.src=src;
-  };
-  // Save vector draw overlay
-  const saveVecDraw=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const d=readNb();const pi=pageIdxRef.current;
-    if(d.pages?.[pi]){d.pages[pi].vecDrawData=c.toDataURL("image/png");saveNb(d);}};
 
-
-
-  // ═══ POLY ART ENGINE — grid-jittered triangulation ═══
-  const generatePolyArt=(imgSrc,numPoints,colorCount,callback)=>{
-    const img=new Image();img.onerror=()=>{alert("Failed to load image");callback(null);};
-    img.onload=()=>{
-      try{
-      const maxDim=800;const scale=Math.min(1,maxDim/Math.max(img.width,img.height));
-      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
-      const tc=document.createElement("canvas");tc.width=w;tc.height=h;
-      const tctx=tc.getContext("2d");tctx.drawImage(img,0,0,w,h);
-      const data=tctx.getImageData(0,0,w,h).data;
-      // Edge detection for adaptive point density
-      const gray=new Float32Array(w*h);
-      for(let i=0;i<w*h;i++)gray[i]=(data[i*4]*0.299+data[i*4+1]*0.587+data[i*4+2]*0.114)/255;
-      const edges=new Float32Array(w*h);
-      for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
-        const gx=gray[(y-1)*w+x+1]-gray[(y-1)*w+x-1]+2*(gray[y*w+x+1]-gray[y*w+x-1])+gray[(y+1)*w+x+1]-gray[(y+1)*w+x-1];
-        const gy=gray[(y+1)*w+x-1]-gray[(y-1)*w+x-1]+2*(gray[(y+1)*w+x]-gray[(y-1)*w+x])+gray[(y+1)*w+x+1]-gray[(y-1)*w+x+1];
-        edges[y*w+x]=Math.sqrt(gx*gx+gy*gy);
-      }
-      // Generate points on a jittered grid, denser near edges
-      const cellSize=Math.sqrt(w*h/numPoints);
-      const cols=Math.ceil(w/cellSize),rows=Math.ceil(h/cellSize);
-      const pts=[];
-      // Border points for clean edges
-      for(let i=0;i<=cols;i++){pts.push({x:i*cellSize,y:0});pts.push({x:i*cellSize,y:h});}
-      for(let i=1;i<rows;i++){pts.push({x:0,y:i*cellSize});pts.push({x:w,y:i*cellSize});}
-      // Interior points
-      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-        const cx=c*cellSize+cellSize/2,cy=r*cellSize+cellSize/2;
-        const ix=Math.min(w-1,Math.floor(cx)),iy=Math.min(h-1,Math.floor(cy));
-        const edgeVal=edges[iy*w+ix];
-        // Add main point with jitter
-        const jitter=cellSize*0.4;
-        pts.push({x:cx+(Math.random()-0.5)*jitter,y:cy+(Math.random()-0.5)*jitter});
-        // Add extra point near edges
-        if(edgeVal>0.15){
-          pts.push({x:cx+(Math.random()-0.5)*jitter*0.5,y:cy+(Math.random()-0.5)*jitter*0.5});
-        }
-      }
-      // Clamp points
-      pts.forEach(p=>{p.x=Math.max(0,Math.min(w,p.x));p.y=Math.max(0,Math.min(h,p.y));});
-      // Simple Delaunay via incremental ear-clipping-like approach
-      // Use a fast O(n log n) sweep approach: sort by x, build triangulation
-      // Actually use a simpler approach: for each grid cell, create 2 triangles, then relax
-      const tris=[];
-      // Create triangulation from points using a simple approach:
-      // Sort points, then do a fan triangulation from nearest neighbors
-      // Better: use grid-based triangulation which is guaranteed to work
-      const gridW=cols+1,gridH=rows+1;
-      const gridPts=[];
-      // Create a regular grid of points first
-      for(let r=0;r<=rows;r++)for(let c=0;c<=cols;c++){
-        const x=Math.min(w,c*cellSize),y=Math.min(h,r*cellSize);
-        const jitter=cellSize*0.35;
-        const ix=Math.min(w-1,Math.floor(x)),iy=Math.min(h-1,Math.floor(y));
-        const edgeVal=(ix>0&&iy>0&&ix<w-1&&iy<h-1)?edges[iy*w+ix]:0;
-        const j=edgeVal>0.15?jitter*0.3:jitter;
-        // Don't jitter border points
-        const isBorder=r===0||r===rows||c===0||c===cols;
-        gridPts.push({
-          x:isBorder?x:x+(Math.random()-0.5)*j*2,
-          y:isBorder?y:y+(Math.random()-0.5)*j*2
-        });
-      }
-      // Create triangles from grid (2 triangles per cell)
-      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-        const tl=r*gridW+c,tr=tl+1,bl=(r+1)*gridW+c,br=bl+1;
-        if(Math.random()<0.5){tris.push({a:tl,b:tr,c:bl});tris.push({a:tr,b:br,c:bl});}
-        else{tris.push({a:tl,b:tr,c:br});tris.push({a:tl,b:br,c:bl});}
-      }
-      // Color each triangle
-      const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
-      const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
-      const nearFull=(r2,g2,b2)=>{let bi=0,bd=Infinity;fullRgb.forEach(([pr,pg,pb],i)=>{const d=(r2-pr)**2+(g2-pg)**2+(b2-pb)**2;if(d<bd){bd=d;bi=i;}});return bi;};
-      const outCanvas=document.createElement("canvas");outCanvas.width=w;outCanvas.height=h;
-      const octx=outCanvas.getContext("2d");
-      const votes=new Map();
-      tris.forEach(t=>{
-        const pa=gridPts[t.a],pb=gridPts[t.b],pc=gridPts[t.c];
-        const cx2=(pa.x+pb.x+pc.x)/3,cy2=(pa.y+pb.y+pc.y)/3;
-        // Sample multiple points inside triangle for better color
-        let sr=0,sg=0,sb=0,sc=0;
-        for(let s=0;s<5;s++){
-          const r1=Math.random(),r2s=Math.random();
-          const sq=Math.sqrt(r1);
-          const sx=(1-sq)*pa.x+sq*(1-r2s)*pb.x+sq*r2s*pc.x;
-          const sy=(1-sq)*pa.y+sq*(1-r2s)*pb.y+sq*r2s*pc.y;
-          const ix=Math.max(0,Math.min(w-1,Math.floor(sx))),iy=Math.max(0,Math.min(h-1,Math.floor(sy)));
-          const idx=(iy*w+ix)*4;sr+=data[idx];sg+=data[idx+1];sb+=data[idx+2];sc++;
-        }
-        if(sc===0)return;sr/=sc;sg/=sc;sb/=sc;
-        const ci=nearFull(sr,sg,sb);votes.set(ci,(votes.get(ci)||0)+1);
-        octx.fillStyle=fullPal[ci];octx.strokeStyle=fullPal[ci];octx.lineWidth=0.5;octx.lineJoin="round";
-        octx.beginPath();octx.moveTo(pa.x,pa.y);octx.lineTo(pb.x,pb.y);octx.lineTo(pc.x,pc.y);octx.closePath();octx.fill();octx.stroke();
-      });
-      const pngUrl=outCanvas.toDataURL("image/png");
-      const topColors=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,colorCount===0?votes.size:colorCount);
-      const colorInfo=topColors.map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
-      callback({pngUrl,width:w,height:h,colors:colorInfo});
-      }catch(err){alert("Error: "+err.message);callback(null);}
-    };img.src=imgSrc;
-  };
-  const polyConvert=(colorCount)=>{
-    polyPendingColors.current=colorCount;
-    polyFileRef.current?.click();
-    const input=polyFileRef.current;
-    if(input){input.onchange=(e)=>{
-      const file=e.target.files?.[0];if(!file)return;e.target.value="";
-      const reader=new FileReader();reader.onload=(ev)=>{
-        setPolyCropBox({x:0,y:0,w:100,h:100});setPolyCropImg(ev.target.result);
-      };reader.readAsDataURL(file);
-    };}
-  };
-  const polyConfirmCrop=()=>{
-    if(!polyCropImg)return;setPolyImporting(true);
-    const src=polyCropImg;setPolyCropImg(null);
-    const ci2=new Image();ci2.onload=()=>{
-      const bx=Math.round(ci2.width*polyCropBox.x/100),by=Math.round(ci2.height*polyCropBox.y/100);
-      const bw=Math.max(1,Math.round(ci2.width*polyCropBox.w/100)),bh=Math.max(1,Math.round(ci2.height*polyCropBox.h/100));
-      const cc=document.createElement("canvas");cc.width=bw;cc.height=bh;
-      cc.getContext("2d").drawImage(ci2,bx,by,bw,bh,0,0,bw,bh);
-      generatePolyArt(cc.toDataURL("image/png"),polyDensity,polyPendingColors.current,(result)=>{
-        setPolyImporting(false);if(!result)return;
-        const d=readNb();const pi=pageIdxRef.current;
-        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;
-          try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
-      });
-    };ci2.src=src;
-  };
 
 
   // ═══ TEXT PAGE ═══
