@@ -7452,11 +7452,11 @@ const NotebookPanel=()=>{
       </div>}
 
       {/* Main image area */}
-      <div ref={(el)=>{artScrollRef.current=el;if(el)pixScrollRef.current=el;}} style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",display:"flex",alignItems:artStyle==="pixel"?"flex-start":"center",justifyContent:"center",padding:artStyle==="pixel"?0:8}}>
+      <div ref={(el)=>{artScrollRef.current=el;if(el)pixScrollRef.current=el;}} style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:artStyle==="pixel"?0:8}}>
         {artStyle==="pixel"&&<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
           <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"none",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
         </div>}
-        {artStyle==="vector"&&<div style={{position:"relative",display:"inline-block",minWidth:hasVecContent?undefined:300,minHeight:hasVecContent?undefined:300}}>
+        {artStyle==="vector"&&<div style={{position:"relative",display:"block",margin:"0 auto",minWidth:hasVecContent?undefined:300,minHeight:hasVecContent?undefined:300,width:hasVecContent?vecImgW*pageZoom:"fit-content"}}>
           {hasVecContent&&<img src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
             const img2=e.target;const nw=img2.naturalWidth,nh=img2.naturalHeight;
             if(nw&&nh&&(nw!==vecImgW||nh!==vecImgH)){setVecImgW(nw);setVecImgH(nh);}
@@ -7539,7 +7539,7 @@ const NotebookPanel=()=>{
             });
           }}} width={800} height={800} style={{position:hasVecContent?"absolute":"relative",inset:hasVecContent?0:undefined,width:hasVecContent?"100%":800*pageZoom,height:hasVecContent?"100%":800*pageZoom,touchAction:"none",cursor:vecEyedropper?"crosshair":"default",background:hasVecContent?"transparent":"rgba(255,255,255,.03)",borderRadius:hasVecContent?0:8,border:hasVecContent?"none":"1px solid rgba(255,255,255,.08)"}}/>
         </div>}
-        {artStyle==="poly"&&<div style={{position:"relative",display:"inline-block",minWidth:polyPng?undefined:300,minHeight:polyPng?undefined:300}}>
+        {artStyle==="poly"&&<div style={{position:"relative",display:"block",margin:"0 auto",minWidth:polyPng?undefined:300,minHeight:polyPng?undefined:300,width:"fit-content"}}>
           {polyPng&&<img src={polyPng} style={{display:"block",width:"auto",height:"auto",maxWidth:"100%",transform:`scale(${pageZoom})`,transformOrigin:"top center"}}/>}
           {/* Draw overlay canvas for poly — freehand drawing with or without converted image */}
           <canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
