@@ -8165,7 +8165,7 @@ const LearnPanel=()=>{
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>🎤</span>
             <a href={t.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
               <div style={{fontSize:15,fontWeight:800,color:"#f093fb",lineHeight:1.3}}>{t.title}</div>
-              {t.speaker&&<div style={{fontSize:12,opacity:.4,marginTop:2}}>{t.speaker}</div>}
+              {t.speaker&&<div style={{fontSize:13,color:"rgba(255,255,255,.65)",marginTop:3}}>{t.speaker}</div>}
             </a>
             <button onClick={()=>toggleTedFav(t)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
@@ -8173,7 +8173,7 @@ const LearnPanel=()=>{
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>📚</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:15,fontWeight:800,color:"#fbbf24",lineHeight:1.3}}>{b.title}</div>
-              <div style={{fontSize:12,opacity:.4,marginTop:2}}>{b.author}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,.65)",marginTop:3}}>{b.author}</div>
             </div>
             <button onClick={()=>toggleBookFav(b)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
@@ -8181,7 +8181,7 @@ const LearnPanel=()=>{
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{c.icon||"📖"}</span>
             <a href={c.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
               <div style={{fontSize:15,fontWeight:800,color:"#22d3ee",lineHeight:1.3}}>{c.name}</div>
-              {c.source&&<div style={{fontSize:12,opacity:.4,marginTop:2}}>{c.source}</div>}
+              {c.source&&<div style={{fontSize:13,color:"rgba(255,255,255,.65)",marginTop:3}}>{c.source}</div>}
             </a>
             <button onClick={()=>toggleCourseFav(c)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
