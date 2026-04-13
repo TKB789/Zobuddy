@@ -6699,6 +6699,7 @@ const NotebookPanel=()=>{
   // pixStrokeAction: "place" or "erase" — locked at start of each stroke so dragging is consistent
   const pixStrokeAction=React.useRef(null);
   const pixPaintedCells=React.useRef(new Set()); // track cells already painted this stroke
+  const pixStrokeChanges=React.useRef([]); // collect changes for current stroke
   const setPixel=(row,col,color,erase)=>{const dims=getPixelDims();if(row<0||row>=dims.r||col<0||col>=dims.c)return;
     const key=`${row}-${col}`;
     // Skip if already painted this cell in current stroke
@@ -6709,24 +6710,41 @@ const NotebookPanel=()=>{
     if(erase){delete pixels[key];}
     else{pixels[key]=color;}
     const newVal=pixels[key]||null;
-    if(old!==newVal){pixelUndoRef.current.push({key,old,newVal});pixelRedoRef.current=[];}
+    if(old!==newVal){pixStrokeChanges.current.push({key,old,newVal});}
     d.pages[nbPageIdx].pixels=pixels;writeNb(d);
     const c=pixCanvasRef.current;if(c){const ctx=c.getContext("2d");const cs=getPixelCellSize();
       if(pixels[key]){ctx.fillStyle=pixels[key];ctx.fillRect(col*cs,row*cs,cs,cs);}
       else{ctx.fillStyle="#f0f0f0";ctx.fillRect(col*cs,row*cs,cs,cs);
         ctx.strokeStyle="rgba(0,0,0,.08)";ctx.lineWidth=0.5;ctx.strokeRect(col*cs,row*cs,cs,cs);}}};
-  const undoPixel=()=>{if(!pixelUndoRef.current.length)return;const entry=pixelUndoRef.current.pop();
-    const{key,old}=entry;
+  // Called when finger lifts — commits current stroke as one undo entry
+  const pixCommitStroke=()=>{
+    if(pixStrokeChanges.current.length>0){
+      pixelUndoRef.current.push([...pixStrokeChanges.current]);
+      pixelRedoRef.current=[];
+    }
+    pixStrokeChanges.current=[];
+  };
+  const undoPixel=()=>{if(!pixelUndoRef.current.length)return;const stroke=pixelUndoRef.current.pop();
     const d=readNb();if(!d.pages?.[nbPageIdx])return;const pixels=d.pages[nbPageIdx].pixels||{};
-    const cur=pixels[key]||null;
-    if(old)pixels[key]=old;else delete pixels[key];d.pages[nbPageIdx].pixels=pixels;writeNb(d);
-    pixelRedoRef.current.push({key,old:cur,newVal:old});
+    const redoEntries=[];
+    // Reverse the stroke in reverse order
+    for(let i=stroke.length-1;i>=0;i--){
+      const{key,old}=stroke[i];const cur=pixels[key]||null;
+      if(old)pixels[key]=old;else delete pixels[key];
+      redoEntries.push({key,old:cur,newVal:old});
+    }
+    d.pages[nbPageIdx].pixels=pixels;writeNb(d);
+    pixelRedoRef.current.push(redoEntries.reverse());
     drawPixelGrid();};
-  const redoPixel=()=>{if(!pixelRedoRef.current.length)return;const entry=pixelRedoRef.current.pop();
-    const{key,old,newVal}=entry;
+  const redoPixel=()=>{if(!pixelRedoRef.current.length)return;const stroke=pixelRedoRef.current.pop();
     const d=readNb();if(!d.pages?.[nbPageIdx])return;const pixels=d.pages[nbPageIdx].pixels||{};
-    if(newVal)pixels[key]=newVal;else delete pixels[key];d.pages[nbPageIdx].pixels=pixels;writeNb(d);
-    pixelUndoRef.current.push({key,old,newVal});
+    const undoEntries=[];
+    for(const{key,old,newVal}of stroke){
+      if(newVal)pixels[key]=newVal;else delete pixels[key];
+      undoEntries.push({key,old,newVal});
+    }
+    d.pages[nbPageIdx].pixels=pixels;writeNb(d);
+    pixelUndoRef.current.push(undoEntries);
     drawPixelGrid();};
   const pixColorRef=React.useRef(pixelColor);pixColorRef.current=pixelColor;
   const pixEraserRef=React.useRef(pixelEraser);pixEraserRef.current=pixelEraser;
@@ -6842,6 +6860,7 @@ const NotebookPanel=()=>{
     pixPinchDist.current=null;pixLastCell.current=null;pixPanStart.current=null;
     pixPaintedCells.current=new Set();
     pixIsPainting.current=false;pixCancelled.current=false;
+    pixCommitStroke();
   };
   const pixCanvasCallbackRef=React.useCallback((node)=>{if(node){pixCanvasRef.current=node;
     node.addEventListener("touchstart",(e)=>pixHandlerRef.current(e,true),{passive:false});
@@ -6849,8 +6868,8 @@ const NotebookPanel=()=>{
     node.addEventListener("touchend",(e)=>pixEndRef.current(e));
     node.addEventListener("mousedown",(e)=>pixHandlerRef.current(e,true));
     node.addEventListener("mousemove",(e)=>pixHandlerRef.current(e,false));
-    node.addEventListener("mouseup",()=>{pixIsPainting.current=false;});
-    node.addEventListener("mouseleave",()=>{pixIsPainting.current=false;});
+    node.addEventListener("mouseup",()=>{pixIsPainting.current=false;pixCommitStroke();});
+    node.addEventListener("mouseleave",()=>{pixIsPainting.current=false;pixCommitStroke();});
     setTimeout(drawPixelGrid,50);}},[nbPageIdx]);
 
   // Redraw when grid section lines change
