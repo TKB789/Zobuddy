@@ -7335,9 +7335,57 @@ const NotebookPanel=()=>{
       const imgSrc=artStyle==="vector"?pg.vectorPng:pg.polyPng;
       const vc=artStyle==="vector"?(pg.vectorColors||[]):(pg.polyColors||[]);
       if(!imgSrc)return;
-      const legendHtml=vc.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-block"></span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""} <span style="color:#888">(${c.count}px)</span></span>`).join("");
-      const win=window.open("","_blank");
-      if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgSrc}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+      const showNums=confirm("Include color numbers on the printout?");
+      const legendHtml=vc.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:16px;height:16px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:${(parseInt(c.color.slice(1,3),16)*.299+parseInt(c.color.slice(3,5),16)*.587+parseInt(c.color.slice(5,7),16)*.114)>128?'#000':'#fff'}">${i+1}</span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""}</span>`).join("");
+      if(!showNums){
+        const win=window.open("","_blank");
+        if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgSrc}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+        return;
+      }
+      // Generate numbered overlay: scan the image pixels, find regions of each color, place numbers
+      const artImg=new Image();artImg.onload=()=>{
+        const w=artImg.width,h=artImg.height;
+        const tc2=document.createElement("canvas");tc2.width=w;tc2.height=h;
+        const tctx2=tc2.getContext("2d");tctx2.drawImage(artImg,0,0);
+        const imgData2=tctx2.getImageData(0,0,w,h).data;
+        // Build color map: for each color in the palette, find all pixel positions
+        const colorMap=new Map();
+        vc.forEach((c,i)=>{colorMap.set(c.color.toLowerCase(),{idx:i+1,positions:[]});});
+        // Scan pixels and match to nearest palette color
+        const htr2=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+        const palRgb=vc.map(c=>({color:c.color.toLowerCase(),rgb:htr2(c.color)}));
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+          const idx4=(y*w+x)*4;const r2=imgData2[idx4],g2=imgData2[idx4+1],b2=imgData2[idx4+2];
+          let bestD=Infinity,bestC=null;
+          palRgb.forEach(p=>{const d2=(r2-p.rgb[0])**2+(g2-p.rgb[1])**2+(b2-p.rgb[2])**2;if(d2<bestD){bestD=d2;bestC=p.color;}});
+          if(bestC&&colorMap.has(bestC))colorMap.get(bestC).positions.push({x,y});
+        }
+        // For each color, find centroid of largest connected region using grid sampling
+        const fontSize2=Math.max(10,Math.round(Math.min(w,h)/40));
+        tctx2.font=`bold ${fontSize2}px sans-serif`;tctx2.textAlign="center";tctx2.textBaseline="middle";
+        colorMap.forEach((data,color)=>{
+          if(data.positions.length===0)return;
+          // Grid-sample centroids: divide positions into a grid, find the cell with most pixels
+          const gridSize=Math.max(20,Math.round(Math.min(w,h)/8));
+          const cells=new Map();
+          data.positions.forEach(p=>{const gx=Math.floor(p.x/gridSize),gy=Math.floor(p.y/gridSize);const gk=gx+","+gy;
+            if(!cells.has(gk))cells.set(gk,{sx:0,sy:0,count:0});const c2=cells.get(gk);c2.sx+=p.x;c2.sy+=p.y;c2.count++;});
+          // Find largest cell
+          let bestCell=null;cells.forEach(c2=>{if(!bestCell||c2.count>bestCell.count)bestCell=c2;});
+          if(!bestCell)return;
+          const cx=Math.round(bestCell.sx/bestCell.count),cy=Math.round(bestCell.sy/bestCell.count);
+          const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
+          // Draw number with outline for readability
+          const numStr=String(data.idx);
+          tctx2.strokeStyle=lum>128?"rgba(0,0,0,.7)":"rgba(255,255,255,.7)";tctx2.lineWidth=Math.max(2,fontSize2/4);
+          tctx2.strokeText(numStr,cx,cy);
+          tctx2.fillStyle=lum>128?"#000":"#fff";
+          tctx2.fillText(numStr,cx,cy);
+        });
+        const numberedUrl=tc2.toDataURL("image/png");
+        const win=window.open("","_blank");
+        if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${numberedUrl}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+      };artImg.src=imgSrc;
     };
     // Convert handler (shared concept)
     const doConvert=(colorCount)=>{
@@ -7386,7 +7434,7 @@ const NotebookPanel=()=>{
           :<span onClick={startRename} style={{fontSize:11,fontWeight:800,color:"#e8e0f0",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:100}}>{nbPageIdx+1}. {page.title||"Untitled"}</span>}
           <button onClick={()=>hasNext&&goNext()} style={{background:"none",border:"none",fontSize:16,color:hasNext?"#a8b4f0":"#333",cursor:hasNext?"pointer":"default",padding:"4px"}}>▶</button>
         </div>
-        <span style={{fontSize:9,opacity:.35,fontWeight:700,padding:"2px 6px",borderRadius:6,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.06)"}}>{artStyle==="pixel"?"🟨 Pixel":artStyle==="vector"?"🎨 Flat":"🔷 Poly"}</span>
+        <button onClick={doSave} style={tbtn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",padding:"6px 10px",fontSize:11}:{color:"#aaa",padding:"6px 10px",fontSize:11})}>{saved?"Saved ✓":"Save"}</button>
       </div>
       {/* Convert row */}
       <div style={{display:"flex",alignItems:"center",gap:3,padding:"4px 10px 2px",flexShrink:0,flexWrap:"wrap"}}>
@@ -7790,9 +7838,8 @@ const NotebookPanel=()=>{
           style={tbtn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:12})}>🗑 Clear</button>}
         {(artStyle==="vector"||artStyle==="poly")&&<button onClick={()=>{if(!confirm("Clear drawing?"))return;const dc=vecDrawCanvasRef.current;if(dc){dc.getContext("2d").clearRect(0,0,dc.width,dc.height);vecPushHistory();saveArtDraw();}}}
           style={tbtn({background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.2)",color:"#f5576c",fontSize:12})}>🗑 Clear</button>}
-        <button onClick={doSave} style={tbtn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",fontSize:12}:{color:"#888",fontSize:12})}>{saved?"✓":"💾"}</button>
         <button onClick={doArtPrint} style={tbtn({color:"#888",fontSize:12})}>🖨</button>
-        <button onClick={doSavePng} style={tbtn({color:"#888",fontSize:12})}>💾</button>
+        <button onClick={doSavePng} style={tbtn({color:"#888",fontSize:12})}>📥</button>
         <button onClick={archiveCurrentPage} style={tbtn({color:"#888",fontSize:12})}>🗃️</button>
         <button onClick={deleteCurrentPage} style={tbtn({color:"#888",fontSize:12})}>🗑️</button>
       </div>
@@ -7931,7 +7978,7 @@ const NotebookPanel=()=>{
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
       <span style={{fontSize:16,fontWeight:900,color:"#e8e0f0"}}>📓 Notes & Doodles</span>
       <div style={{display:"flex",gap:4}}>
-        <button onClick={togglePreviewMode} style={btn({fontSize:11,padding:"4px 8px",color:nbPreviewMode?"#a8b4f0":"#888",background:nbPreviewMode?"rgba(102,126,234,.12)":"transparent"})}>{nbPreviewMode?"👁":"👁‍🗨"}</button>
+        <button onClick={togglePreviewMode} style={btn({fontSize:10,padding:"4px 8px",color:nbPreviewMode?"#a8b4f0":"#888",background:nbPreviewMode?"rgba(102,126,234,.12)":"transparent"})}>{nbPreviewMode?"Preview ✓":"Preview"}</button>
         <button onClick={()=>setNbView("archive")} style={btn({fontSize:11,padding:"4px 8px",color:"#888"})}>🗃️ {nbData.archive.length}</button>
         <button onClick={()=>setNbView("newpw")} style={btn({fontSize:11,padding:"4px 8px",color:"#888"})}>{nbData.pwHash?"🔐":"🔓"}</button>
       </div></div>
