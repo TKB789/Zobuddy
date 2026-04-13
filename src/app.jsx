@@ -7654,18 +7654,24 @@ const NotebookPanel=()=>{
             {(()=>{const pixels=getPixels();const colorCounts={};Object.values(pixels).forEach(color=>{colorCounts[color]=(colorCounts[color]||0)+1;});
               const ranked=Object.entries(colorCounts).sort((a,b)=>b[1]-a[1]);
               if(ranked.length>0){
-                const shown=ranked.slice(0,10);
-                return <>{shown.map(([color])=>(<div key={color} onClick={()=>{setPixelColor(color);setPixelEraser(false);}}
-                  style={cSwatch(color,pixelColor===color&&!pixelEraser,28)}/>))}
-                  {ranked.length>10&&<span style={{fontSize:9,opacity:.3,fontWeight:700}}>+{ranked.length-10}</span>}
+                const shown=ranked.slice(0,12);
+                return <>{shown.map(([color])=>{const pm=PIXEL_PALETTE.find(p2=>p2.c===color);const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
+                  return(<div key={color} onClick={()=>{setPixelColor(color);setPixelEraser(false);}} title={pm?`DMC ${pm.n} — ${pm.nm} (${colorCounts[color]}px)`:`Custom (${colorCounts[color]}px)`}
+                  style={{...cSwatch(color,pixelColor===color&&!pixelEraser,30),display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                  <span style={{fontSize:7,fontWeight:800,color:lum>128?"rgba(0,0,0,.6)":"rgba(255,255,255,.7)",lineHeight:1,textAlign:"center"}}>{pm?pm.n:""}</span>
+                </div>);})}
+                  {ranked.length>12&&<span style={{fontSize:9,opacity:.3,fontWeight:700}}>+{ranked.length-12}</span>}
                 </>;
               }
               return [
                 PIXEL_PALETTE.find(p=>p.n==="321"),PIXEL_PALETTE.find(p=>p.n==="797"),PIXEL_PALETTE.find(p=>p.n==="973"),
                 PIXEL_PALETTE.find(p=>p.n==="699"),PIXEL_PALETTE.find(p=>p.n==="740"),PIXEL_PALETTE.find(p=>p.n==="550"),
                 PIXEL_PALETTE.find(p=>p.n==="310"),PIXEL_PALETTE.find(p=>p.n==="414"),PIXEL_PALETTE.find(p=>p.n==="Blanc")
-              ].filter(Boolean).map(p=>(<div key={p.n} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} ${p.nm}`}
-                style={cSwatch(p.c,pixelColor===p.c&&!pixelEraser,28)}/>));
+              ].filter(Boolean).map(p=>{const lum=parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114;
+                return(<div key={p.n} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} ${p.nm}`}
+                style={{...cSwatch(p.c,pixelColor===p.c&&!pixelEraser,30),display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <span style={{fontSize:7,fontWeight:800,color:lum>128?"rgba(0,0,0,.6)":"rgba(255,255,255,.7)",lineHeight:1}}>{p.n}</span>
+              </div>);});
             })()}
             <button onClick={()=>{setShowPixPicker(v=>!v);setPixPaletteSearch("");}} style={tbtn({padding:"6px 10px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>{showPixPicker?"▼":"🎨"}</button>
           </>}
@@ -7698,22 +7704,6 @@ const NotebookPanel=()=>{
           <span style={{opacity:.6}}> — {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.nm||"Custom"}</span>
         </div>
       </div>}
-      {/* Thread list (pixel) */}
-      {artStyle==="pixel"&&showPixPicker&&(()=>{const pixels=getPixels();
-        const colorCounts={};Object.values(pixels).forEach(color=>{colorCounts[color]=(colorCounts[color]||0)+1;});
-        const ranked=Object.entries(colorCounts).sort((a,b)=>b[1]-a[1]);
-        return ranked.length>0?<div style={{padding:"2px 10px 4px",flexShrink:0}}>
-          <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 Thread List ({ranked.length} colors · {Object.keys(pixels).length} total pixels)</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:3,maxHeight:100,overflowY:"auto"}}>
-            {ranked.map(([color,count],i)=>{const p=PIXEL_PALETTE.find(p2=>p2.c===color);return <div key={color} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.04)",borderRadius:5,padding:"2px 6px"}}>
-              <div style={cSwatch(color,false,14)}><span style={{fontSize:7,fontWeight:800,color:parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114>128?"#000":"#fff"}}>{i+1}</span></div>
-              <span style={{fontSize:9,color:"#feca57",fontWeight:700}}>#{i+1}</span>
-              {p&&<span style={{fontSize:9,color:"#e8e0f0",fontWeight:700}}>DMC {p.n}</span>}
-              <span style={{fontSize:8,color:"rgba(232,224,240,.3)"}}>({count}px)</span>
-            </div>;})}
-          </div>
-        </div>:null;
-      })()}
       {/* Thread list (vector/poly) */}
       {(artStyle==="vector"||artStyle==="poly")&&artColors.length>0&&<div style={{padding:"2px 10px 4px",flexShrink:0}}>
         <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 {artColors.length} colors</div>
