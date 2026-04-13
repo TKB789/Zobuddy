@@ -6658,7 +6658,7 @@ const NotebookPanel=()=>{
         const nearSub=(r,g,b)=>{let bi=0,bd=Infinity;subRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return subPal[bi];};
         for(let row=0;row<dims.r;row++)for(let col=0;col<dims.c;col++){const idx=(row*dims.c+col)*4;const r=data[idx],g=data[idx+1],b=data[idx+2],a=data[idx+3];if(a<30)continue;newPixels[`${row}-${col}`]=nearSub(r,g,b);}}
       const d=readNb();const pi=pageIdxRef.current;
-      if(d.pages?.[pi]){d.pages[pi].pixels=newPixels;d.pages[pi].pixOriginal=tc.toDataURL("image/png");
+      if(d.pages?.[pi]){d.pages[pi].pixels=newPixels;d.pages[pi].pixOriginal=canvasToJpeg(tc,0.6);
         try{writeNb(d);setNbData({...d});}catch(e){alert("Save failed: "+e.message);}
       }else{alert("Page not found at index "+pi);}
       setTimeout(drawPixelGrid,50);setPixImporting(false);setPixImgCrop(null);
@@ -7009,7 +7009,7 @@ const NotebookPanel=()=>{
         imgData.data[i*4]=r;imgData.data[i*4+1]=g;imgData.data[i*4+2]=b;imgData.data[i*4+3]=255;
       }
       octx.putImageData(imgData,0,0);
-      const pngUrl=outCanvas.toDataURL("image/png");
+      const pngUrl=outCanvas.toDataURL("image/jpeg",0.85);
       // Build simple SVG as well (for SVG export) using larger rects
       let svgPaths="";
       const usedColors=[...new Set(Array.from(clean).filter(v=>v!==65535))];
@@ -7045,7 +7045,8 @@ const NotebookPanel=()=>{
     if(input){input.onchange=(e)=>{
       const file=e.target.files?.[0];if(!file)return;e.target.value="";
       const reader=new FileReader();reader.onload=(ev)=>{
-        setVecCropBox({x:0,y:0,w:100,h:100});setVecCropImg(ev.target.result);
+        setVecCropBox({x:0,y:0,w:100,h:100});
+        compressForStorage(ev.target.result,0.7,1200,(compressed)=>setVecCropImg(compressed));
       };reader.readAsDataURL(file);
     };}
   };
@@ -7061,7 +7062,7 @@ const NotebookPanel=()=>{
         setVecImporting(false);if(!result)return;
         vecSvgRef.current=result.svg;
         const d=readNb();const pi=pageIdxRef.current;
-        if(d.pages?.[pi]){d.pages[pi].vectorPng=result.pngUrl||"";d.pages[pi].vectorColors=result.colors;d.pages[pi].vecDrawData=null;d.pages[pi].vectorOriginal=cc.toDataURL("image/png");delete d.pages[pi].vectorSvg;
+        if(d.pages?.[pi]){d.pages[pi].vectorPng=result.pngUrl||"";d.pages[pi].vectorColors=result.colors;d.pages[pi].vecDrawData=null;d.pages[pi].vectorOriginal=canvasToJpeg(cc,0.6);delete d.pages[pi].vectorSvg;
           try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
       });
     };ci2.src=src;
@@ -7074,6 +7075,27 @@ const NotebookPanel=()=>{
     if(d.pages?.[pi]){d.pages[pi].polyDrawData=c.toDataURL("image/png");saveNb(d);}};
   const saveArtDraw=()=>{const d=readNb();const pg=d.pages?.[pageIdxRef.current];if(!pg)return;
     if(pg.type==="vector")saveVecDraw();else if(pg.type==="poly")savePolyDraw();};
+  // ─── Image compression helpers for storage ─────────────────
+  // Compresses a data URL to JPEG at given quality (0-1). Returns via callback.
+  // For images with transparency, falls back to lower-res PNG.
+  const compressForStorage=(dataUrl,quality,maxDim,callback)=>{
+    if(!dataUrl||!dataUrl.startsWith("data:"))return callback(dataUrl);
+    const img=new Image();img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(maxDim&&Math.max(w,h)>maxDim){const s=maxDim/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+      const c=document.createElement("canvas");c.width=w;c.height=h;
+      const ctx=c.getContext("2d");ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
+      callback(c.toDataURL("image/jpeg",quality||0.7));
+    };img.onerror=()=>callback(dataUrl);img.src=dataUrl;
+  };
+  // Synchronous version for canvas (no transparency needed for originals)
+  const canvasToJpeg=(canvas,quality)=>{
+    if(!canvas)return"";
+    const c2=document.createElement("canvas");c2.width=canvas.width;c2.height=canvas.height;
+    const ctx=c2.getContext("2d");ctx.fillStyle="#000";ctx.fillRect(0,0,c2.width,c2.height);
+    ctx.drawImage(canvas,0,0);
+    return c2.toDataURL("image/jpeg",quality||0.7);
+  };
 
 
 
@@ -7172,7 +7194,7 @@ const NotebookPanel=()=>{
         octx.fillStyle=fullPal[ci];octx.strokeStyle=fullPal[ci];octx.lineWidth=0.5;octx.lineJoin="round";
         octx.beginPath();octx.moveTo(pa.x,pa.y);octx.lineTo(pb.x,pb.y);octx.lineTo(pc.x,pc.y);octx.closePath();octx.fill();octx.stroke();
       });
-      const pngUrl=outCanvas.toDataURL("image/png");
+      const pngUrl=outCanvas.toDataURL("image/jpeg",0.85);
       const topColors=[...votes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,colorCount===0?votes.size:colorCount);
       const colorInfo=topColors.map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
       callback({pngUrl,width:w,height:h,colors:colorInfo});
@@ -7186,7 +7208,8 @@ const NotebookPanel=()=>{
     if(input){input.onchange=(e)=>{
       const file=e.target.files?.[0];if(!file)return;e.target.value="";
       const reader=new FileReader();reader.onload=(ev)=>{
-        setPolyCropBox({x:0,y:0,w:100,h:100});setPolyCropImg(ev.target.result);
+        setPolyCropBox({x:0,y:0,w:100,h:100});
+        compressForStorage(ev.target.result,0.7,1200,(compressed)=>setPolyCropImg(compressed));
       };reader.readAsDataURL(file);
     };}
   };
@@ -7201,7 +7224,7 @@ const NotebookPanel=()=>{
       generatePolyArt(cc.toDataURL("image/png"),polyDensity,polyPendingColors.current,(result)=>{
         setPolyImporting(false);if(!result)return;
         const d=readNb();const pi=pageIdxRef.current;
-        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;d.pages[pi].polyOriginal=cc.toDataURL("image/png");
+        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;d.pages[pi].polyOriginal=canvasToJpeg(cc,0.6);
           try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
       });
     };ci2.src=src;
