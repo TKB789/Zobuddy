@@ -6658,7 +6658,7 @@ const NotebookPanel=()=>{
         const nearSub=(r,g,b)=>{let bi=0,bd=Infinity;subRgb.forEach(([pr,pg,pb],i)=>{const d=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d<bd){bd=d;bi=i;}});return subPal[bi];};
         for(let row=0;row<dims.r;row++)for(let col=0;col<dims.c;col++){const idx=(row*dims.c+col)*4;const r=data[idx],g=data[idx+1],b=data[idx+2],a=data[idx+3];if(a<30)continue;newPixels[`${row}-${col}`]=nearSub(r,g,b);}}
       const d=readNb();const pi=pageIdxRef.current;
-      if(d.pages?.[pi]){d.pages[pi].pixels=newPixels;
+      if(d.pages?.[pi]){d.pages[pi].pixels=newPixels;d.pages[pi].pixOriginal=imgSrc;
         try{writeNb(d);setNbData({...d});}catch(e){alert("Save failed: "+e.message);}
       }else{alert("Page not found at index "+pi);}
       setTimeout(drawPixelGrid,50);setPixImporting(false);setPixImgCrop(null);
@@ -7201,7 +7201,7 @@ const NotebookPanel=()=>{
       generatePolyArt(cc.toDataURL("image/png"),polyDensity,polyPendingColors.current,(result)=>{
         setPolyImporting(false);if(!result)return;
         const d=readNb();const pi=pageIdxRef.current;
-        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;
+        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;d.pages[pi].polyOriginal=cc.toDataURL("image/png");
           try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
       });
     };ci2.src=src;
@@ -7332,7 +7332,7 @@ const NotebookPanel=()=>{
         </>}
       </div>
       {/* Original photo opacity slider (vector only) */}
-      {artStyle==="vector"&&page.vectorOriginal&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px",flexShrink:0}}>
+      {(page.vectorOriginal||page.pixOriginal||page.polyOriginal)&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px",flexShrink:0}}>
         <span style={{fontSize:10,opacity:.4}}>📷 Original:</span>
         <input type="range" min="0" max="100" value={vecOrigOpacity*100} onChange={e=>setVecOrigOpacity(Number(e.target.value)/100)}
           style={{flex:1,height:4,accentColor:"#60a5fa",opacity:.7,maxWidth:120}}/>
@@ -7395,8 +7395,7 @@ const NotebookPanel=()=>{
             onPointerUp={()=>{vecCropDrag.current=null;}}>
             <img src={vecCropImg} style={{width:"100%",height:"auto",borderRadius:6,display:"block",pointerEvents:"none"}}/>
             <div style={{position:"absolute",top:`${vecCropBox.y}%`,left:`${vecCropBox.x}%`,width:`${vecCropBox.w}%`,height:`${vecCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:3,pointerEvents:"none"}}/>
-            {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h])=>(
-              <div key={v+h} style={{position:"absolute",[v]:v==="top"?`${vecCropBox.y}%`:`${vecCropBox.y+vecCropBox.h}%`,[h]:h==="left"?`${vecCropBox.x}%`:`${vecCropBox.x+vecCropBox.w}%`,width:20,height:20,marginLeft:-10,marginTop:-10,borderRadius:10,background:"#feca57",border:"2px solid #000",pointerEvents:"none"}}/>))}
+
             <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
               <div style={{position:"absolute",top:0,left:0,right:0,height:`${vecCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
               <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-vecCropBox.y-vecCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
@@ -7435,8 +7434,7 @@ const NotebookPanel=()=>{
             onPointerUp={()=>{polyCropDrag.current=null;}}>
             <img src={polyCropImg} style={{width:"100%",height:"auto",borderRadius:6,display:"block",pointerEvents:"none"}}/>
             <div style={{position:"absolute",top:`${polyCropBox.y}%`,left:`${polyCropBox.x}%`,width:`${polyCropBox.w}%`,height:`${polyCropBox.h}%`,border:"2px solid #feca57",boxSizing:"border-box",borderRadius:3,pointerEvents:"none"}}/>
-            {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h])=>(
-              <div key={v+h} style={{position:"absolute",[v]:v==="top"?`${polyCropBox.y}%`:`${polyCropBox.y+polyCropBox.h}%`,[h]:h==="left"?`${polyCropBox.x}%`:`${polyCropBox.x+polyCropBox.w}%`,width:20,height:20,marginLeft:-10,marginTop:-10,borderRadius:10,background:"#feca57",border:"2px solid #000",pointerEvents:"none"}}/>))}
+
             <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
               <div style={{position:"absolute",top:0,left:0,right:0,height:`${polyCropBox.y}%`,background:"rgba(0,0,0,.5)"}}/>
               <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${100-polyCropBox.y-polyCropBox.h}%`,background:"rgba(0,0,0,.5)"}}/>
@@ -7453,8 +7451,9 @@ const NotebookPanel=()=>{
 
       {/* Main image area */}
       <div ref={(el)=>{artScrollRef.current=el;if(el)pixScrollRef.current=el;}} style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:artStyle==="pixel"?0:8}}>
-        {artStyle==="pixel"&&<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH}}>
+        {artStyle==="pixel"&&<div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:cW/pageZoom,height:cH/pageZoom,minWidth:cW,minHeight:cH,position:"relative"}}>
           <canvas ref={pixCanvasCallbackRef} width={cW} height={cH} style={{width:cW,height:cH,touchAction:"none",cursor:"crosshair",display:"block",imageRendering:"pixelated"}}/>
+          {page.pixOriginal&&vecOrigOpacity>0&&<img src={page.pixOriginal} style={{position:"absolute",top:0,left:0,width:cW,height:cH,opacity:vecOrigOpacity,pointerEvents:"none",imageRendering:"pixelated"}}/>}
         </div>}
         {artStyle==="vector"&&<div style={{position:"relative",display:"block",margin:"0 auto",minWidth:hasVecContent?undefined:300,minHeight:hasVecContent?undefined:300,width:hasVecContent?vecImgW*pageZoom:"fit-content"}}>
           {hasVecContent&&<img src={vecPng} style={{display:"block",imageRendering:"auto",width:vecImgW*pageZoom,height:vecImgH*pageZoom}} onLoad={(e)=>{
@@ -7541,6 +7540,7 @@ const NotebookPanel=()=>{
         </div>}
         {artStyle==="poly"&&<div style={{position:"relative",display:"block",margin:"0 auto",minWidth:polyPng?undefined:300,minHeight:polyPng?undefined:300,width:"fit-content"}}>
           {polyPng&&<img src={polyPng} style={{display:"block",width:"auto",height:"auto",maxWidth:"100%",transform:`scale(${pageZoom})`,transformOrigin:"top center"}}/>}
+          {page.polyOriginal&&vecOrigOpacity>0&&polyPng&&<img src={page.polyOriginal} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",opacity:vecOrigOpacity,pointerEvents:"none"}}/>}
           {/* Draw overlay canvas for poly — freehand drawing with or without converted image */}
           <canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
             const d3=readNb();const dd=d3.pages?.[pageIdxRef.current]?.polyDrawData;
