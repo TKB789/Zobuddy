@@ -7644,9 +7644,9 @@ const NotebookPanel=()=>{
       </div>
 
       {/* === BOTTOM: Color palette + Draw tools + Zoom + Actions (thumb zone) === */}
-      {/* Color Palette */}
+      {/* Color Palette — unified for all art types */}
       <div style={{padding:"4px 10px 2px",flexShrink:0}}>
-        <div style={{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center"}}>
+        <div style={{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center",maxHeight:108,overflowY:"auto",overflowX:"hidden"}}>
           {artStyle==="pixel"&&<>
             <button onClick={()=>setPixelEraser(e=>!e)} style={tbtn(pixelEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",padding:"6px 10px"}:{color:"#ccc",padding:"6px 10px"})}>
               {pixelEraser?<span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span>:"✏️"}</button>
@@ -7676,34 +7676,39 @@ const NotebookPanel=()=>{
             <button onClick={()=>{setVecEyedropper(false);setVecDrawEraser(e=>!e);}} style={tbtn(vecDrawEraser?{background:"rgba(245,87,108,.25)",border:"1px solid rgba(245,87,108,.5)",color:"#f5576c",padding:"6px 10px"}:{color:"#ccc",padding:"6px 10px"})}>
               {vecDrawEraser?<span style={{display:"inline-block",transform:"rotate(180deg)"}}>✏️</span>:"✏️"}</button>
             <div style={{width:1,height:24,background:"rgba(255,255,255,.1)"}}/>
-            {(vecPalExpanded?sortedColors:sortedColors.slice(0,8)).map((c,i)=><div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);setVecEyedropper(false);}}
-              style={cSwatch(c.color,vecDrawColor===c.color&&!vecDrawEraser,28)}/>)}
-            {sortedColors.length>8&&!vecPalExpanded&&<button onClick={()=>setVecPalExpanded(true)}
-              style={tbtn({padding:"4px 8px",fontSize:10,color:"#999"})}>+{sortedColors.length-8}</button>}
-            {vecPalExpanded&&sortedColors.length>8&&<button onClick={()=>setVecPalExpanded(false)}
-              style={tbtn({padding:"4px 8px",fontSize:10,color:"#feca57"})}>▲</button>}
-            {artColors.length===0&&["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313","#5C184E","#feca57","#8C8C8C"].map(c=><div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
-              style={cSwatch(c,vecDrawColor===c&&!vecDrawEraser,28)}/>)}
+            {(()=>{
+              if(sortedColors.length>0){
+                return sortedColors.map((c,i)=>{const pm=PIXEL_PALETTE.find(p2=>p2.c===c.color);const lum=parseInt(c.color.slice(1,3),16)*.299+parseInt(c.color.slice(3,5),16)*.587+parseInt(c.color.slice(5,7),16)*.114;
+                  return(<div key={i} onClick={()=>{setVecDrawColor(c.color);setVecDrawEraser(false);setVecEyedropper(false);}} title={pm?`DMC ${pm.n} — ${pm.nm}`:`Custom`}
+                  style={{...cSwatch(c.color,vecDrawColor===c.color&&!vecDrawEraser,30),display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:7,fontWeight:800,color:lum>128?"rgba(0,0,0,.6)":"rgba(255,255,255,.7)",lineHeight:1,textAlign:"center"}}>{pm?pm.n:""}</span>
+                </div>);});
+              }
+              return ["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313","#5C184E","#feca57","#8C8C8C"].map(c=>{
+                const lum=parseInt(c.slice(1,3),16)*.299+parseInt(c.slice(3,5),16)*.587+parseInt(c.slice(5,7),16)*.114;
+                const pm=PIXEL_PALETTE.find(p2=>p2.c===c);
+                return(<div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
+                  style={{...cSwatch(c,vecDrawColor===c&&!vecDrawEraser,30),display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:7,fontWeight:800,color:lum>128?"rgba(0,0,0,.6)":"rgba(255,255,255,.7)",lineHeight:1}}>{pm?pm.n:""}</span>
+                </div>);});
+            })()}
+            <button onClick={()=>{setShowPixPicker(v=>!v);setPixPaletteSearch("");}} style={tbtn({padding:"6px 10px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>{showPixPicker?"▼":"🎨"}</button>
           </>}
         </div>
       </div>
-      {/* Full DMC palette (pixel) */}
-      {artStyle==="pixel"&&showPixPicker&&<div style={{padding:"4px 10px 4px",flexShrink:0}}>
+      {/* Full DMC palette (all art types) */}
+      {showPixPicker&&<div style={{padding:"4px 10px 4px",flexShrink:0}}>
         <input value={pixPaletteSearch} onChange={e=>setPixPaletteSearch(e.target.value)} placeholder="Search DMC # or color name..." style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"#e8e0f0",fontSize:11,outline:"none",marginBottom:4,boxSizing:"border-box"}}/>
         <div style={{display:"grid",gridTemplateColumns:"repeat(12,1fr)",gap:2,maxHeight:90,overflowY:"auto",overflowX:"hidden"}}>
-          {(pixPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=pixPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>(<div key={p.n+p.c} onClick={()=>{setPixelColor(p.c);setPixelEraser(false);}} title={`DMC ${p.n} — ${p.nm}`}
-            style={{position:"relative",aspectRatio:"1",borderRadius:3,background:p.c,border:pixelColor===p.c&&!pixelEraser?"2px solid #feca57":(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)<80?"1px solid rgba(255,255,255,.35)":"1px solid rgba(0,0,0,.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minWidth:0}}>
+          {(pixPaletteSearch.trim()?PIXEL_PALETTE.filter(p=>{const q=pixPaletteSearch.toLowerCase();return p.n.toLowerCase().includes(q)||p.nm.toLowerCase().includes(q);}):PIXEL_PALETTE).map(p=>{const selColor=artStyle==="pixel"?pixelColor:vecDrawColor;const isSel=p.c===selColor;return(<div key={p.n+p.c} onClick={()=>{if(artStyle==="pixel"){setPixelColor(p.c);setPixelEraser(false);}else{setVecDrawColor(p.c);setVecDrawEraser(false);setVecEyedropper(false);}}} title={`DMC ${p.n} — ${p.nm}`}
+            style={{position:"relative",aspectRatio:"1",borderRadius:3,background:p.c,border:isSel?"2px solid #feca57":(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)<80?"1px solid rgba(255,255,255,.35)":"1px solid rgba(0,0,0,.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minWidth:0}}>
             <span style={{fontSize:6,fontWeight:700,color:(parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114)>128?"rgba(0,0,0,.5)":"rgba(255,255,255,.6)",lineHeight:1,textAlign:"center",overflow:"hidden"}}>{p.n}</span>
-          </div>))}
+          </div>);})}
         </div>
-        <div style={{fontSize:10,marginTop:4,textAlign:"center",color:"rgba(232,224,240,.5)"}}>
-          <span style={{fontWeight:700}}>DMC {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.n||"—"}</span>
-          <span style={{opacity:.6}}> — {PIXEL_PALETTE.find(p=>p.c===pixelColor)?.nm||"Custom"}</span>
-        </div>
-      </div>}
-      {/* Thread list (vector/poly) */}
-      {(artStyle==="vector"||artStyle==="poly")&&artColors.length>0&&<div style={{padding:"2px 10px 4px",flexShrink:0}}>
-        <div style={{fontSize:10,fontWeight:700,color:"rgba(232,224,240,.4)",marginBottom:3}}>🧵 {artColors.length} colors</div>
+        {(()=>{const selColor=artStyle==="pixel"?pixelColor:vecDrawColor;const pm=PIXEL_PALETTE.find(p=>p.c===selColor);return <div style={{fontSize:10,marginTop:4,textAlign:"center",color:"rgba(232,224,240,.5)"}}>
+          <span style={{fontWeight:700}}>DMC {pm?.n||"—"}</span>
+          <span style={{opacity:.6}}> — {pm?.nm||"Custom"}</span>
+        </div>;})()}
       </div>}
 
       {/* Draw tools row */}
