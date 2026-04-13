@@ -7997,6 +7997,7 @@ const NotebookPanel=()=>{
 // ─── LEARN PANEL (inline tab — no notebook) ──────────────────────────────
 const LearnPanel=()=>{
   const[learnTab,setLearnTab]=useState("picks");
+  const[favCatFilter,setFavCatFilter]=useState("all");
   const[expanded,setExpanded]=useState(null);
   const[teaserRevealed,setTeaserRevealed]=useState(false);
   const[apiTrivia,setApiTrivia]=useState(null);
@@ -8120,11 +8121,16 @@ const LearnPanel=()=>{
         <Card icon={course.icon} title="Free Course" color="rgba(34,211,238)" link={course.url} onFav={()=>toggleCourseFav(course)} isFav={isCourseFav(course)}><div style={{fontSize:16,fontWeight:700}}>{course.name}</div><div style={{fontSize:14,opacity:.5}}>{course.source} • {course.cat}</div></Card>
       </div>}
       {learnTab==="news"&&<div style={{flex:1,overflowY:"auto",padding:"0 14px 14px"}}>
-        {/* Saved Favorites — Card Style */}
+        {/* Saved Favorites — with category filter */}
         {totalFavs>0&&<div style={{marginBottom:12}}>
-          <div style={{fontSize:12,fontWeight:700,opacity:.35,marginBottom:8}}>SAVED FAVORITES ({totalFavs})</div>
+          <div style={{fontSize:12,fontWeight:700,opacity:.35,marginBottom:6}}>SAVED FAVORITES ({totalFavs})</div>
+          {/* Category filter tabs */}
+          <div style={{display:"flex",gap:3,marginBottom:8,overflowX:"auto",flexShrink:0}}>
+            {[{id:"all",label:"All",icon:""},{id:"quotes",label:"Quotes",icon:"💬"},{id:"facts",label:"Facts",icon:"🧠"},{id:"words",label:"Words",icon:"📖"},{id:"mindful",label:"Mindful",icon:"🧘"},{id:"tips",label:"Tips",icon:"💡"},{id:"teds",label:"Talks",icon:"🎤"},{id:"books",label:"Books",icon:"📚"},{id:"courses",label:"Courses",icon:"🎓"},{id:"news",label:"Sites",icon:"🌐"}].filter(cat=>cat.id==="all"||(learnFavs[cat.id]||[]).length>0).map(cat=>(
+              <button key={cat.id} onClick={()=>setFavCatFilter(cat.id)} style={{padding:"5px 10px",borderRadius:8,border:favCatFilter===cat.id?"1px solid rgba(102,126,234,.4)":"1px solid rgba(255,255,255,.06)",background:favCatFilter===cat.id?"rgba(102,126,234,.12)":"rgba(255,255,255,.02)",color:favCatFilter===cat.id?"#a8b4f0":"#666",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{cat.icon?cat.icon+" ":""}{cat.label}{cat.id!=="all"?" ("+(learnFavs[cat.id]||[]).length+")":""}</button>))}
+          </div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {(learnFavs.quotes||[]).map((q,i)=>(<div key={"fq"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(254,202,87,.06)",border:"1px solid rgba(254,202,87,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="quotes")&&(learnFavs.quotes||[]).map((q,i)=>(<div key={"fq"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(254,202,87,.06)",border:"1px solid rgba(254,202,87,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>💬</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:14,fontStyle:"italic",color:"rgba(232,224,240,.8)",lineHeight:1.4,marginBottom:2}}>"{q.q}"</div>
@@ -8132,14 +8138,14 @@ const LearnPanel=()=>{
             </div>
             <button onClick={()=>toggleSimpleFav("quotes",q,x=>x.q===q.q)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {(learnFavs.facts||[]).map((f,i)=>(<div key={"ff"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(147,130,250,.06)",border:"1px solid rgba(147,130,250,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="facts")&&(learnFavs.facts||[]).map((f,i)=>(<div key={"ff"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(147,130,250,.06)",border:"1px solid rgba(147,130,250,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>🧠</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:14,color:"rgba(232,224,240,.8)",lineHeight:1.4}}>{f.text}</div>
             </div>
             <button onClick={()=>toggleSimpleFav("facts",f,x=>x.text===f.text)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {(learnFavs.words||[]).map((w,i)=>(<div key={"fw"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="words")&&(learnFavs.words||[]).map((w,i)=>(<div key={"fw"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>📖</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:16,fontWeight:800,color:"#60a5fa",marginBottom:2}}>{w.word}</div>
@@ -8147,21 +8153,21 @@ const LearnPanel=()=>{
             </div>
             <button onClick={()=>toggleSimpleFav("words",w,x=>x.word===w.word)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {(learnFavs.mindful||[]).map((m,i)=>(<div key={"fm"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(67,233,123,.06)",border:"1px solid rgba(67,233,123,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="mindful")&&(learnFavs.mindful||[]).map((m,i)=>(<div key={"fm"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(67,233,123,.06)",border:"1px solid rgba(67,233,123,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{m.icon}</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:14,color:"rgba(232,224,240,.8)",lineHeight:1.4}}>{m.practice}</div>
             </div>
             <button onClick={()=>toggleSimpleFav("mindful",m,x=>x.practice===m.practice)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {(learnFavs.tips||[]).map((t,i)=>(<div key={"fti"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(240,147,251,.06)",border:"1px solid rgba(240,147,251,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="tips")&&(learnFavs.tips||[]).map((t,i)=>(<div key={"fti"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(240,147,251,.06)",border:"1px solid rgba(240,147,251,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{t.icon}</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:14,color:"rgba(232,224,240,.8)",lineHeight:1.4}}>{t.tip}</div>
             </div>
             <button onClick={()=>toggleSimpleFav("tips",t,x=>x.tip===t.tip)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {learnFavs.teds.map((t,i)=>(<div key={"ft"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(240,147,251,.06)",border:"1px solid rgba(240,147,251,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="teds")&&learnFavs.teds.map((t,i)=>(<div key={"ft"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(240,147,251,.06)",border:"1px solid rgba(240,147,251,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>🎤</span>
             <a href={t.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
               <div style={{fontSize:15,fontWeight:800,color:"#f093fb",lineHeight:1.3}}>{t.title}</div>
@@ -8169,7 +8175,7 @@ const LearnPanel=()=>{
             </a>
             <button onClick={()=>toggleTedFav(t)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {learnFavs.books.map((b,i)=>(<div key={"fb"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="books")&&learnFavs.books.map((b,i)=>(<div key={"fb"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>📚</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:15,fontWeight:800,color:"#fbbf24",lineHeight:1.3}}>{b.title}</div>
@@ -8177,7 +8183,7 @@ const LearnPanel=()=>{
             </div>
             <button onClick={()=>toggleBookFav(b)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {learnFavs.courses.map((c,i)=>(<div key={"fc"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(34,211,238,.06)",border:"1px solid rgba(34,211,238,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="courses")&&learnFavs.courses.map((c,i)=>(<div key={"fc"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(34,211,238,.06)",border:"1px solid rgba(34,211,238,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{c.icon||"📖"}</span>
             <a href={c.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
               <div style={{fontSize:15,fontWeight:800,color:"#22d3ee",lineHeight:1.3}}>{c.name}</div>
@@ -8185,7 +8191,7 @@ const LearnPanel=()=>{
             </a>
             <button onClick={()=>toggleCourseFav(c)} style={{background:"rgba(245,87,108,.1)",border:"1px solid rgba(245,87,108,.2)",borderRadius:8,color:"#f5576c",fontSize:14,cursor:"pointer",padding:"6px 10px",flexShrink:0,fontWeight:700}}>✕</button>
           </div>))}
-          {(learnFavs.news||[]).map((n,i)=>(<div key={"fn"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)"}}>
+          {(favCatFilter==="all"||favCatFilter==="news")&&(learnFavs.news||[]).map((n,i)=>(<div key={"fn"+i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",borderRadius:14,background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)"}}>
             <span style={{fontSize:22,flexShrink:0,lineHeight:1}}>{n.icon}</span>
             <a href={n.url} target="_blank" rel="noopener noreferrer" style={{flex:1,textDecoration:"none",minWidth:0}}>
               <div style={{fontSize:15,fontWeight:800,color:"#a8b4f0",lineHeight:1.3}}>{n.name}</div>
@@ -8213,7 +8219,6 @@ const LearnPanel=()=>{
         </div>}
         {filteredSites.map((s,i)=>{
           const realIdx=newsSources.indexOf(s);
-          const isFav=isSimpleFav("news",x=>x.name===s.name);
           return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
             <a href={s.url} target="_blank" rel="noopener noreferrer"
               style={{flex:1,display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,
@@ -8222,8 +8227,6 @@ const LearnPanel=()=>{
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800}}>{s.name}</div>{s.cat&&<div style={{fontSize:11,opacity:.35,marginTop:1}}>{s.cat}</div>}</div>
               <span style={{fontSize:14,opacity:.3}}>↗</span>
             </a>
-            <button onClick={(e)=>{e.stopPropagation();toggleSimpleFav("news",{name:s.name,url:s.url,icon:s.icon},x=>x.name===s.name);}}
-              style={{background:"none",border:"none",fontSize:18,cursor:"pointer",padding:"4px",opacity:isFav?1:.3}}>{isFav?"⭐":"☆"}</button>
             <button onClick={(e)=>{e.stopPropagation();deleteNewsSource(realIdx);}}
               style={{background:"none",border:"none",fontSize:14,cursor:"pointer",padding:"4px",color:"#f5576c",opacity:.4}}>✕</button>
           </div>);
