@@ -1422,7 +1422,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",maxWidth:320,marginBottom:6}}>
         <span style={{fontSize:14,fontWeight:800,color:"#f5576c"}}>💩 {MINES-flagCount}</span>
         <span style={{fontSize:14,fontWeight:800,color:"#feca57"}}>⏱ {elapsed}s</span>
-        <button onClick={()=>setFlagMode(!flagMode)} style={{background:flagMode?"rgba(245,87,108,.25)":"rgba(102,126,234,.15)",border:flagMode?"2px solid rgba(245,87,108,.5)":"2px solid rgba(102,126,234,.3)",borderRadius:10,padding:"6px 16px",fontSize:14,fontWeight:800,color:flagMode?"#f5576c":"#a8b4f0",cursor:"pointer"}}>{flagMode?"🚩 Flagging":"👆 Picking"}</button>
+        <button onClick={()=>setFlagMode(!flagMode)} style={{background:flagMode?"rgba(245,87,108,.25)":"rgba(102,126,234,.15)",border:flagMode?"2px solid rgba(245,87,108,.5)":"2px solid rgba(102,126,234,.3)",borderRadius:10,padding:"6px 16px",fontSize:14,fontWeight:800,color:flagMode?"#f5576c":"#a8b4f0",cursor:"pointer"}}>{flagMode?"🚩 Flagging":"👌 Picking"}</button>
       </div>
       <div style={{textAlign:"center",fontSize:11,opacity:.3,marginBottom:6}}>{flagMode?"Tap a cell to flag/unflag it":"Tap a clover to pick · Switch to 🚩 to flag"}</div>
       {/* Grid - stays in place always */}
@@ -1441,7 +1441,7 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
         </div>
         {/* Game end overlay - positioned over the grid */}
         {(gameOver||won)&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.7)",borderRadius:8}}>
-          <div style={{fontSize:28,fontWeight:900,color:won?"#43e97b":"#f5576c",textShadow:"0 2px 8px rgba(0,0,0,.5)"}}>{won?"🌈🍀 Luck Is On Your Side!":"💩 Oh Poo-Hoo! Mud all over you!"}</div>
+          <div style={{textAlign:"center",color:won?"#43e97b":"#f5576c",textShadow:"0 2px 8px rgba(0,0,0,.5)"}}><div style={{fontSize:36}}>{won?"🌈🍀":"💩"}</div><div style={{fontSize:22,fontWeight:900,marginTop:4}}>{won?"Luck Is On Your Side!":"Better Luck Next Time!"}</div></div>
           {won&&<div style={{fontSize:16,color:"#feca57",fontWeight:800,marginTop:4}}>Time: {elapsed}s</div>}
           {won&&best>0&&elapsed<=best&&<div style={{fontSize:13,color:"#43e97b",fontWeight:700}}>🏆 Best!</div>}
           {won&&best>0&&elapsed>best&&<div style={{fontSize:12,opacity:.5}}>Best: {best}s</div>}
