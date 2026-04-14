@@ -1584,10 +1584,42 @@ const MiniGames=({onClose,goalsToday,totalGoals})=>{
         }
         dragRef.current=null;setDragging(null);
       };
+      // Mouse handlers for desktop
+      const onMD=(e)=>{
+        const hit=touchHandlersRef.current.findTouchedBuddy(e.clientX,e.clientY);
+        if(!hit)return;
+        e.preventDefault();e.stopPropagation();
+        dragRef.current={...hit,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,isDrag:false};
+      };
+      const onMM=(e)=>{
+        if(!dragRef.current)return;e.preventDefault();
+        const dx=e.clientX-dragRef.current.startX,dy=e.clientY-dragRef.current.startY;
+        const isDrag=dragRef.current.isDrag||Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD;
+        dragRef.current={...dragRef.current,x:e.clientX,y:e.clientY,isDrag};
+        if(isDrag)setDragging({...dragRef.current});
+      };
+      const onMU=(e)=>{
+        if(!dragRef.current)return;
+        const d=dragRef.current;
+        const h=touchHandlersRef.current;
+        if(!d.isDrag){
+          if(d.fromArea==="pool")h.tapFromPool(d.fromIdx);
+          else h.tapFromPlatform(d.fromIdx);
+        } else {
+          const platIdx=h.findPlatSlotAt(e.clientX,e.clientY);
+          const poolIdx=h.findPoolSlotAt(e.clientX,e.clientY);
+          if(platIdx>=0)h.moveBuddy(d.buddy,d.fromArea,d.fromIdx,"platform",platIdx);
+          else if(poolIdx>=0)h.moveBuddy(d.buddy,d.fromArea,d.fromIdx,"pool",poolIdx);
+        }
+        dragRef.current=null;setDragging(null);
+      };
       node.addEventListener("touchstart",onTS,{passive:false});
       node.addEventListener("touchmove",onTM,{passive:false});
       node.addEventListener("touchend",onTE);
-      node._cleanupTouch=()=>{node.removeEventListener("touchstart",onTS);node.removeEventListener("touchmove",onTM);node.removeEventListener("touchend",onTE);};
+      node.addEventListener("mousedown",onMD);
+      document.addEventListener("mousemove",onMM);
+      document.addEventListener("mouseup",onMU);
+      node._cleanupTouch=()=>{node.removeEventListener("touchstart",onTS);node.removeEventListener("touchmove",onTM);node.removeEventListener("touchend",onTE);node.removeEventListener("mousedown",onMD);document.removeEventListener("mousemove",onMM);document.removeEventListener("mouseup",onMU);};
     },[]);
 
     if(!answer)return null;
