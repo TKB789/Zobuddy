@@ -8468,7 +8468,7 @@ const LearnPanel=()=>{
           <div style={{flex:1,minWidth:0}}><div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{title}</div></div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          {onFav&&<button onClick={e=>{e.stopPropagation();onFav();}} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",padding:"6px 8px",margin:"-6px 0",opacity:isFav?1:.3}}>{isFav?"⭐":"☆"}</button>}
+          {onFav&&<button onClick={e=>{e.stopPropagation();onFav();}} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",padding:"6px 8px",margin:"-6px 0",opacity:isFav?1:.5,filter:isFav?"none":"grayscale(1)"}}>{isFav?"⭐":"⭐"}</button>}
           {link?<span style={{fontSize:14,opacity:.3}}>↗</span>:<span style={{fontSize:14,opacity:.3}}>{expanded===id?"▲":"▼"}</span>}
         </div>
       </div>
