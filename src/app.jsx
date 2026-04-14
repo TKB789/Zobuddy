@@ -7430,20 +7430,38 @@ const NotebookPanel=()=>{
     const doArtPrint=()=>{
       if(artStyle==="pixel"){printPixelArt();return;}
       const d=readNb();const pg=d.pages?.[pageIdxRef.current];if(!pg)return;
-      const imgSrc=artStyle==="vector"?pg.vectorPng:pg.polyPng;
+      const baseSrc=artStyle==="vector"?pg.vectorPng:pg.polyPng;
+      const drawCanvas=vecDrawCanvasRef.current;
+      // Need at least a converted image OR a drawing
+      if(!baseSrc&&!drawCanvas)return;
+      // Composite base image + draw overlay into a single image for printing
+      const getCompositeImage=(callback)=>{
+        if(baseSrc&&drawCanvas){
+          // Has both: composite
+          const bg=new Image();bg.onload=()=>{
+            const comp=document.createElement("canvas");comp.width=bg.width;comp.height=bg.height;
+            const ctx=comp.getContext("2d");ctx.drawImage(bg,0,0);ctx.drawImage(drawCanvas,0,0,comp.width,comp.height);
+            callback(comp.toDataURL("image/png"),bg.width,bg.height);
+          };bg.src=baseSrc;
+        } else if(baseSrc){
+          const bg=new Image();bg.onload=()=>callback(baseSrc,bg.width,bg.height);bg.src=baseSrc;
+        } else if(drawCanvas){
+          callback(drawCanvas.toDataURL("image/png"),drawCanvas.width,drawCanvas.height);
+        } else {return;}
+      };
       const vc=artStyle==="vector"?(pg.vectorColors||[]):(pg.polyColors||[]);
-      if(!imgSrc)return;
-      const showNums=confirm("Include color numbers on the printout?");
+      const showNums=vc.length>0?confirm("Include color numbers on the printout?"):false;
       const legendHtml=vc.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:16px;height:16px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:${(parseInt(c.color.slice(1,3),16)*.299+parseInt(c.color.slice(3,5),16)*.587+parseInt(c.color.slice(5,7),16)*.114)>128?'#000':'#fff'}">${i+1}</span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""}</span>`).join("");
       const openPrintWindow=(imgUrl)=>{
         const win=window.open("","_blank");
-        if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgUrl}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+        if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgUrl}" style="max-width:100%;height:auto"/>${legendHtml?`<div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div>`:""}<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
       };
-      if(!showNums){openPrintWindow(imgSrc);return;}
-      const htr2=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
-      const vcRgb=vc.map(c=>htr2(c.color));
-      const nearVc=(r,g,b)=>{let bd=Infinity,bi=0;vcRgb.forEach(([pr,pg,pb],i)=>{const d2=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d2<bd){bd=d2;bi=i;}});return bi;};
-      const artImg=new Image();artImg.onload=()=>{
+      getCompositeImage((compositeSrc,w,h)=>{
+        if(!showNums||vc.length===0){openPrintWindow(compositeSrc);return;}
+        const htr2=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+        const vcRgb=vc.map(c=>htr2(c.color));
+        const nearVc=(r,g,b)=>{let bd=Infinity,bi=0;vcRgb.forEach(([pr,pg,pb],i)=>{const d2=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d2<bd){bd=d2;bi=i;}});return bi;};
+        const artImg=new Image();artImg.onload=()=>{
         const w=artImg.width,h=artImg.height;
         // Work at original resolution for region detection
         const qCtx=(()=>{const c=document.createElement("canvas");c.width=w;c.height=h;const x=c.getContext("2d");x.drawImage(artImg,0,0);return x;})();
@@ -7519,7 +7537,8 @@ const NotebookPanel=()=>{
           tctx.fillText(String(num),cx,cy);
         }
         openPrintWindow(tc.toDataURL("image/png"));
-      };artImg.src=imgSrc;
+      };artImg.src=compositeSrc;
+      });
     };
     // Convert handler (shared concept)
     const doConvert=(colorCount)=>{
@@ -7751,7 +7770,7 @@ const NotebookPanel=()=>{
             const img2=e.target;const nw=img2.naturalWidth,nh=img2.naturalHeight;
             if(nw&&nh&&(nw!==vecImgW||nh!==vecImgH)){setVecImgW(nw);setVecImgH(nh);}
           }}/>}
-          {page.vectorOriginal&&vecOrigOpacity>0&&<img src={page.vectorOriginal} style={{position:"absolute",inset:0,width:"100%",height:"100%",opacity:vecOrigOpacity,pointerEvents:"none",mixBlendMode:"normal"}}/>}
+          {page.vectorOriginal&&vecOrigOpacity>0&&<img src={page.vectorOriginal} style={{position:"absolute",top:0,left:0,width:vecImgW*pageZoom,height:vecImgH*pageZoom,opacity:vecOrigOpacity,pointerEvents:"none",mixBlendMode:"normal"}}/>}
           {/* Square grid overlay */}
           {hasVecContent&&vecGrid>0&&(()=>{
             const natW=vecImgW,natH=vecImgH;
