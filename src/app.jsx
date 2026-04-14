@@ -7643,7 +7643,7 @@ const NotebookPanel=()=>{
               d2.pages[nbPageIdx].pixels=newPx;
               writeNb(d2);setNbData({...d2});setTimeout(drawPixelGrid,50);
             }} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:active?"1px solid rgba(96,165,250,.5)":"1px solid rgba(255,255,255,.06)",background:active?"rgba(96,165,250,.15)":"transparent",color:active?"#60a5fa":"#666",cursor:"pointer"}}>{s.l}</button>);})}
-          <input value={customPixelW} onChange={e=>setCustomPixelW(e.target.value.replace(/\D/g,""))} placeholder="Custom"
+          <input value={customPixelW} onChange={e=>setCustomPixelW(e.target.value.replace(/[^\dx×,]/gi,""))} placeholder="Custom"
             onKeyDown={e=>{if(e.key==="Enter"){const v=customPixelW.trim();if(!v)return;
               const parts=v.split(/[x×,]/i);const w2=Math.max(4,Math.min(512,Number(parts[0])||32));const h2=parts[1]?Math.max(4,Math.min(512,Number(parts[1])||w2)):w2;
               const sizeId=`${w2}x${h2}`;if(sizeId===(page.pixelSize||"32x32"))return;
@@ -7653,6 +7653,15 @@ const NotebookPanel=()=>{
               Object.entries(oldPx).forEach(([key,color])=>{const[r,c]=key.split("-").map(Number);if(r<h2&&c<w2)newPx[key]=color;});
               d2.pages[nbPageIdx].pixels=newPx;writeNb(d2);setNbData({...d2});setTimeout(drawPixelGrid,50);setCustomPixelW("");}}}
             style={{width:60,padding:"3px 6px",borderRadius:6,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.06)",color:"#60a5fa",fontSize:10,fontWeight:700,textAlign:"center",outline:"none"}}/>
+          <button onClick={()=>{const v=customPixelW.trim();if(!v)return;
+            const parts=v.split(/[x×,]/i);const w2=Math.max(4,Math.min(512,Number(parts[0])||32));const h2=parts[1]?Math.max(4,Math.min(512,Number(parts[1])||w2)):w2;
+            const sizeId=`${w2}x${h2}`;if(sizeId===(page.pixelSize||"32x32"))return;
+            if(!confirm(`Resize grid to ${w2}×${h2}? Pixels outside the new grid will be trimmed.`))return;
+            const d2=readNb();if(!d2.pages?.[nbPageIdx])return;d2.pages[nbPageIdx].pixelSize=sizeId;
+            const oldPx=d2.pages[nbPageIdx].pixels||{};const newPx={};
+            Object.entries(oldPx).forEach(([key,color])=>{const[r,c]=key.split("-").map(Number);if(r<h2&&c<w2)newPx[key]=color;});
+            d2.pages[nbPageIdx].pixels=newPx;writeNb(d2);setNbData({...d2});setTimeout(drawPixelGrid,50);setCustomPixelW("");}}
+            style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.15)",color:"#60a5fa",cursor:"pointer"}}>Go</button>
         </>}
         {artStyle==="poly"&&<>
           <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Detail:</span>
@@ -7884,6 +7893,28 @@ const NotebookPanel=()=>{
               if(e.touches.length<2){pinching2=false;lastPinchDist2=0;}
               if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveArtDraw();}
             });
+            // Mouse handlers for desktop
+            el.addEventListener("mousedown",(e)=>{
+              if(e.button!==0)return;e.preventDefault();const p=getXY2(e);
+              if(vecEyedropperRef.current){
+                const baseImg=el.parentElement?.querySelector("img");if(baseImg){
+                  const tc2=document.createElement("canvas");tc2.width=baseImg.naturalWidth||800;tc2.height=baseImg.naturalHeight||800;
+                  tc2.getContext("2d").drawImage(baseImg,0,0,tc2.width,tc2.height);
+                  const ix=Math.floor(p.x*tc2.width/el.width),iy=Math.floor(p.y*tc2.height/el.height);
+                  const px2=tc2.getContext("2d").getImageData(ix,iy,1,1).data;
+                  setVecDrawColor("#"+[px2[0],px2[1],px2[2]].map(v=>v.toString(16).padStart(2,"0")).join(""));setVecEyedropper(false);
+                }return;}
+              vecPushHistory();vecIsDrawing.current=true;const ctx=el.getContext("2d");
+              const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
+              if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
+              else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
+              ctx.lineCap="round";ctx.lineJoin="round";
+              ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);
+            });
+            const onMouseMove2=(e)=>{if(!vecIsDrawing.current)return;const p=getXY2(e);const ctx=el.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke();};
+            const onMouseUp2=()=>{if(vecIsDrawing.current){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();saveArtDraw();}};
+            document.addEventListener("mousemove",onMouseMove2);
+            document.addEventListener("mouseup",onMouseUp2);
           }}} width={800} height={800} style={{position:hasVecContent?"absolute":"relative",inset:hasVecContent?0:undefined,width:hasVecContent?"100%":800*pageZoom,height:hasVecContent?"100%":800*pageZoom,touchAction:"none",cursor:vecEyedropper?"crosshair":"default",background:hasVecContent?"transparent":"rgba(255,255,255,.03)",borderRadius:hasVecContent?0:8,border:hasVecContent?"none":"1px solid rgba(255,255,255,.08)"}}/>
         </div>}
         {artStyle==="poly"&&<div style={{position:"relative",display:"block",margin:"0 auto",minWidth:polyPng?undefined:300,minHeight:polyPng?undefined:300,width:"fit-content"}}>
@@ -7955,6 +7986,28 @@ const NotebookPanel=()=>{
               if(e.touches.length<2){pinching2=false;lastPinchDist2=0;}
               if(vecIsDrawing.current&&e.touches.length===0){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();savePolyDraw();}
             });
+            // Mouse handlers for desktop
+            el.addEventListener("mousedown",(e)=>{
+              if(e.button!==0)return;e.preventDefault();const p=getXY2(e);
+              if(vecEyedropperRef.current){
+                const baseImg=el.parentElement?.querySelector("img");if(baseImg){
+                  const tc2=document.createElement("canvas");tc2.width=baseImg.naturalWidth||800;tc2.height=baseImg.naturalHeight||800;
+                  tc2.getContext("2d").drawImage(baseImg,0,0,tc2.width,tc2.height);
+                  const ix=Math.floor(p.x*tc2.width/el.width),iy=Math.floor(p.y*tc2.height/el.height);
+                  const px2=tc2.getContext("2d").getImageData(ix,iy,1,1).data;
+                  setVecDrawColor("#"+[px2[0],px2[1],px2[2]].map(v=>v.toString(16).padStart(2,"0")).join(""));setVecEyedropper(false);
+                }return;}
+              vecPushHistory();vecIsDrawing.current=true;const ctx=el.getContext("2d");
+              const col=vecDrawColorRef.current,sz=vecDrawSizeRef.current,erasing=vecDrawEraserRef.current;
+              if(erasing){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=sz*3;}
+              else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=col;ctx.lineWidth=sz;}
+              ctx.lineCap="round";ctx.lineJoin="round";
+              ctx.beginPath();ctx.arc(p.x,p.y,erasing?sz*1.5:sz/2,0,Math.PI*2);ctx.fillStyle=erasing?"rgba(0,0,0,1)":col;ctx.fill();ctx.beginPath();ctx.moveTo(p.x,p.y);
+            });
+            const onMM3=(e)=>{if(!vecIsDrawing.current)return;const p=getXY2(e);const ctx=el.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke();};
+            const onMU3=()=>{if(vecIsDrawing.current){vecIsDrawing.current=false;el.getContext("2d").globalCompositeOperation="source-over";vecPushHistory();savePolyDraw();}};
+            document.addEventListener("mousemove",onMM3);
+            document.addEventListener("mouseup",onMU3);
           }}} width={800} height={800} style={{position:polyPng?"absolute":"relative",inset:polyPng?0:undefined,width:polyPng?"100%":800*pageZoom,height:polyPng?"100%":800*pageZoom,touchAction:"none",cursor:vecEyedropper?"crosshair":"default",background:polyPng?"transparent":"rgba(255,255,255,.03)",borderRadius:polyPng?0:8,border:polyPng?"none":"1px solid rgba(255,255,255,.08)"}}/>
         </div>}
       </div>
