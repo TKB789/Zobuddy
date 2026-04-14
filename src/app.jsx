@@ -7199,11 +7199,49 @@ const NotebookPanel=()=>{
     };ci2.src=src;
   };
   // Save vector draw overlay
+  // Helper: scan a canvas for unique non-transparent colors, return as DMC-matched palette entries
+  const scanDrawColors=(canvas)=>{
+    if(!canvas)return[];
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width,h=canvas.height;
+    const data=ctx.getImageData(0,0,w,h).data;
+    const htr=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+    const fullPal=PIXEL_PALETTE.map(p=>p.c);const fullRgb=fullPal.map(htr);
+    const seen=new Set();const colors=[];
+    // Sample every 4th pixel for speed
+    for(let i=0;i<data.length;i+=16){
+      const r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];
+      if(a<128)continue; // skip transparent
+      // Find nearest DMC
+      let bd=Infinity,bi=0;fullRgb.forEach(([pr,pg,pb],j)=>{const d2=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d2<bd){bd=d2;bi=j;}});
+      const hex=fullPal[bi];
+      if(!seen.has(hex)){seen.add(hex);colors.push({color:hex,dmc:PIXEL_PALETTE[bi],count:1});}
+    }
+    return colors;
+  };
+  // Merge new draw colors into a page's existing color list
+  const mergeDrawColors=(existingColors,drawColors)=>{
+    const existing=new Set((existingColors||[]).map(c=>c.color.toLowerCase()));
+    const merged=[...(existingColors||[])];
+    drawColors.forEach(dc=>{if(!existing.has(dc.color.toLowerCase())){merged.push(dc);existing.add(dc.color.toLowerCase());}});
+    return merged;
+  };
   const saveVecDraw=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const d=readNb();const pi=pageIdxRef.current;
-    if(d.pages?.[pi]){d.pages[pi].vecDrawData=c.toDataURL("image/png");saveNb(d);}};
+    if(d.pages?.[pi]){
+      d.pages[pi].vecDrawData=c.toDataURL("image/png");
+      // Merge any new drawing colors into the page palette
+      const drawColors=scanDrawColors(c);
+      if(drawColors.length>0){d.pages[pi].vectorColors=mergeDrawColors(d.pages[pi].vectorColors,drawColors);}
+      saveNb(d);setNbData({...d,pages:d.pages.map((p,j)=>j===pi?{...p}:p)});
+    }};
   // Save poly draw overlay (reuses vecDrawCanvas when on a poly page)
   const savePolyDraw=()=>{const c=vecDrawCanvasRef.current;if(!c)return;const d=readNb();const pi=pageIdxRef.current;
-    if(d.pages?.[pi]){d.pages[pi].polyDrawData=c.toDataURL("image/png");saveNb(d);}};
+    if(d.pages?.[pi]){
+      d.pages[pi].polyDrawData=c.toDataURL("image/png");
+      const drawColors=scanDrawColors(c);
+      if(drawColors.length>0){d.pages[pi].polyColors=mergeDrawColors(d.pages[pi].polyColors,drawColors);}
+      saveNb(d);setNbData({...d,pages:d.pages.map((p,j)=>j===pi?{...p}:p)});
+    }};
   const saveArtDraw=()=>{const d=readNb();const pg=d.pages?.[pageIdxRef.current];if(!pg)return;
     if(pg.type==="vector")saveVecDraw();else if(pg.type==="poly")savePolyDraw();};
   // ─── Image compression helpers for storage ─────────────────
