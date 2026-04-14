@@ -6229,6 +6229,7 @@ const NotebookPanel=()=>{
   const vecPendingLimit=React.useRef(0);
   const[vecDrawMode,setVecDrawMode]=useState(false);
   const[vecGrid,setVecGrid]=useState(0); // 0=off, 5,10,20 = grid divisions
+  const[polyGrid,setPolyGrid]=useState(0);
   const[vecImgW,setVecImgW]=useState(800);
   const[vecImgH,setVecImgH]=useState(800);
   const[vecOrigOpacity,setVecOrigOpacity]=useState(0); // 0 = hidden, 0.1-1 = visible
@@ -7569,20 +7570,8 @@ const NotebookPanel=()=>{
         </div>
         <button onClick={doSave} style={tbtn(saved?{background:"rgba(67,233,123,.15)",border:"1px solid rgba(67,233,123,.3)",color:"#43e97b",padding:"6px 10px",fontSize:11}:{color:"#aaa",padding:"6px 10px",fontSize:11})}>{saved?"Saved ✓":"Save"}</button>
       </div>
-      {/* Row 1: Convert */}
+      {/* Row 1: Pixel=Size, Flat/Poly=Detail */}
       <div style={{display:"flex",alignItems:"center",gap:3,padding:"4px 10px 2px",flexShrink:0,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Convert:</span>
-        {[8,16,32].map(n=>(
-          <button key={n} onClick={()=>doConvert(n)} disabled={isConverting}
-            style={tbtn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷"+n}</button>))}
-        <input value={customColorCount} onChange={e=>setCustomColorCount(e.target.value.replace(/\D/g,""))} placeholder="48" style={{width:36,padding:"3px 4px",borderRadius:6,border:"1px solid rgba(102,126,234,.3)",background:"rgba(102,126,234,.06)",color:"#a8b4f0",fontSize:11,fontWeight:700,textAlign:"center",outline:"none"}}/>
-        <button onClick={()=>{const n=Math.max(2,Math.min(438,Number(customColorCount)||32));doConvert(n);}} disabled={isConverting}
-          style={tbtn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷Go"}</button>
-        <button onClick={()=>doConvert(0)} disabled={isConverting}
-          style={tbtn({background:"rgba(240,147,251,.1)",border:"1px solid rgba(240,147,251,.2)",color:"#f093fb",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷All"}</button>
-      </div>
-      {/* Row 2: Pixel=Size, Flat/Poly=Detail */}
-      <div style={{display:"flex",alignItems:"center",gap:3,padding:"2px 10px",flexShrink:0,flexWrap:"wrap"}}>
         {artStyle==="pixel"&&<>
           <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Size:</span>
           {[{id:"16x16",l:"16"},{id:"32x32",l:"32"},{id:"48x48",l:"48"},{id:"64x64",l:"64"},{id:"128x128",l:"128"}].map(s=>{
@@ -7597,6 +7586,16 @@ const NotebookPanel=()=>{
               d2.pages[nbPageIdx].pixels=newPx;
               writeNb(d2);setNbData({...d2});setTimeout(drawPixelGrid,50);
             }} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:active?"1px solid rgba(96,165,250,.5)":"1px solid rgba(255,255,255,.06)",background:active?"rgba(96,165,250,.15)":"transparent",color:active?"#60a5fa":"#666",cursor:"pointer"}}>{s.l}</button>);})}
+          <input value={customPixelW} onChange={e=>setCustomPixelW(e.target.value.replace(/\D/g,""))} placeholder="Custom"
+            onKeyDown={e=>{if(e.key==="Enter"){const v=customPixelW.trim();if(!v)return;
+              const parts=v.split(/[x×,]/i);const w2=Math.max(4,Math.min(512,Number(parts[0])||32));const h2=parts[1]?Math.max(4,Math.min(512,Number(parts[1])||w2)):w2;
+              const sizeId=`${w2}x${h2}`;if(sizeId===(page.pixelSize||"32x32"))return;
+              if(!confirm(`Resize grid to ${w2}×${h2}? Pixels outside the new grid will be trimmed.`))return;
+              const d2=readNb();if(!d2.pages?.[nbPageIdx])return;d2.pages[nbPageIdx].pixelSize=sizeId;
+              const oldPx=d2.pages[nbPageIdx].pixels||{};const newPx={};
+              Object.entries(oldPx).forEach(([key,color])=>{const[r,c]=key.split("-").map(Number);if(r<h2&&c<w2)newPx[key]=color;});
+              d2.pages[nbPageIdx].pixels=newPx;writeNb(d2);setNbData({...d2});setTimeout(drawPixelGrid,50);setCustomPixelW("");}}}
+            style={{width:60,padding:"3px 6px",borderRadius:6,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.06)",color:"#60a5fa",fontSize:10,fontWeight:700,textAlign:"center",outline:"none"}}/>
         </>}
         {artStyle==="poly"&&<>
           <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Detail:</span>
@@ -7608,6 +7607,20 @@ const NotebookPanel=()=>{
           {[{v:"low",l:"Smooth"},{v:"med",l:"Med"},{v:"high",l:"Detailed"},{v:"ultra",l:"Sharp"}].map(d=>(
             <button key={d.v} onClick={()=>setVecDensity(d.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:vecDensity===d.v?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.06)",background:vecDensity===d.v?"rgba(102,126,234,.15)":"transparent",color:vecDensity===d.v?"#a8b4f0":"#666",cursor:"pointer"}}>{d.l}</button>))}
         </>}
+      </div>
+      {/* Row 2: Convert */}
+      <div style={{display:"flex",alignItems:"center",gap:3,padding:"2px 10px",flexShrink:0,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,opacity:.4,fontWeight:700}}>Convert:</span>
+        {[8,16,32].map(n=>(
+          <button key={n} onClick={()=>doConvert(n)} disabled={isConverting}
+            style={tbtn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷"+n}</button>))}
+        <input value={customColorCount} onChange={e=>setCustomColorCount(e.target.value.replace(/\D/g,""))} placeholder="Custom"
+          onKeyDown={e=>{if(e.key==="Enter"){const n=Math.max(2,Math.min(438,Number(customColorCount)||32));doConvert(n);}}}
+          style={{width:60,padding:"3px 6px",borderRadius:6,border:"1px solid rgba(102,126,234,.3)",background:"rgba(102,126,234,.06)",color:"#a8b4f0",fontSize:10,fontWeight:700,textAlign:"center",outline:"none"}}/>
+        <button onClick={()=>{const n=Math.max(2,Math.min(438,Number(customColorCount)||32));doConvert(n);}} disabled={isConverting}
+          style={tbtn({background:"rgba(102,126,234,.1)",border:"1px solid rgba(102,126,234,.2)",color:"#a8b4f0",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷Go"}</button>
+        <button onClick={()=>doConvert(0)} disabled={isConverting}
+          style={tbtn({background:"rgba(240,147,251,.1)",border:"1px solid rgba(240,147,251,.2)",color:"#f093fb",fontSize:10,padding:"5px 8px"})}>{isConverting?"...":"📷All"}</button>
       </div>
       {/* Row 3: Original photo opacity slider */}
       {(page.vectorOriginal||page.pixOriginal||page.polyOriginal)&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 10px",flexShrink:0}}>
@@ -7819,6 +7832,16 @@ const NotebookPanel=()=>{
         {artStyle==="poly"&&<div style={{position:"relative",display:"block",margin:"0 auto",minWidth:polyPng?undefined:300,minHeight:polyPng?undefined:300,width:"fit-content"}}>
           {polyPng&&<img src={polyPng} style={{display:"block",width:"auto",height:"auto",maxWidth:"100%",transform:`scale(${pageZoom})`,transformOrigin:"top center"}}/>}
           {page.polyOriginal&&vecOrigOpacity>0&&polyPng&&<img src={page.polyOriginal} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",opacity:vecOrigOpacity,pointerEvents:"none"}}/>}
+          {/* Poly grid overlay */}
+          {polyPng&&polyGrid>0&&(()=>{
+            const natW=800,natH=800;
+            const cellSize2=Math.min(natW,natH)/polyGrid;
+            const cols2=Math.floor(natW/cellSize2),rows2=Math.floor(natH/cellSize2);
+            return <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox={`0 0 ${natW} ${natH}`} preserveAspectRatio="none">
+              {Array.from({length:cols2-1},(_,i)=><line key={"v"+i} x1={cellSize2*(i+1)} y1="0" x2={cellSize2*(i+1)} y2={natH} stroke="rgba(255,255,255,.4)" strokeWidth="1"/>)}
+              {Array.from({length:rows2-1},(_,i)=><line key={"h"+i} x1="0" y1={cellSize2*(i+1)} x2={natW} y2={cellSize2*(i+1)} stroke="rgba(255,255,255,.4)" strokeWidth="1"/>)}
+            </svg>;
+          })()}
           {/* Draw overlay canvas for poly — freehand drawing with or without converted image */}
           <canvas ref={(el)=>{if(el&&!vecDrawCanvasRef.current){vecDrawCanvasRef.current=el;
             const d3=readNb();const dd=d3.pages?.[pageIdxRef.current]?.polyDrawData;
@@ -7979,6 +8002,12 @@ const NotebookPanel=()=>{
           <span style={{fontSize:10,opacity:.3,fontWeight:700}}>Grid:</span>
           {[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
             <button key={g.v} onClick={()=>setVecGrid(g.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:vecGrid===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:vecGrid===g.v?"rgba(254,202,87,.12)":"transparent",color:vecGrid===g.v?"#feca57":"#555",cursor:"pointer"}}>{g.l}</button>))}
+        </>}
+        {artStyle==="poly"&&<>
+          <div style={{width:1,height:24,background:"rgba(255,255,255,.08)"}}/>
+          <span style={{fontSize:10,opacity:.3,fontWeight:700}}>Grid:</span>
+          {[{v:0,l:"Off"},{v:5,l:"5"},{v:10,l:"10"},{v:20,l:"20"}].map(g=>(
+            <button key={g.v} onClick={()=>setPolyGrid(g.v)} style={{padding:"3px 6px",borderRadius:6,fontSize:10,fontWeight:700,border:polyGrid===g.v?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.06)",background:polyGrid===g.v?"rgba(254,202,87,.12)":"transparent",color:polyGrid===g.v?"#feca57":"#555",cursor:"pointer"}}>{g.l}</button>))}
         </>}
       </div>
 
@@ -8154,29 +8183,11 @@ const NotebookPanel=()=>{
               {s.label}<div style={{fontSize:9,opacity:.5,marginTop:2}}>{s.desc}</div></button>))}
         </div>
       </div>}
-      {nbNewType==="art"&&nbNewArtStyle==="pixel"&&<div style={{marginBottom:6}}>
-        <div style={{fontSize:11,opacity:.4,marginBottom:4}}>Grid size:</div>
-        <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
-          {PIXEL_SIZES.map(s=>(<button key={s.id} onClick={()=>setNbPixelSize(s.id)}
-            style={{padding:"4px 8px",borderRadius:6,border:nbPixelSize===s.id?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.08)",
-              background:nbPixelSize===s.id?"rgba(254,202,87,.12)":"rgba(255,255,255,.03)",color:nbPixelSize===s.id?"#feca57":"#888",fontSize:10,fontWeight:700,cursor:"pointer"}}>{s.label}<div style={{fontSize:9,opacity:.5}}>{s.desc}</div></button>))}
-          <button onClick={()=>setNbPixelSize("custom")}
-            style={{padding:"4px 8px",borderRadius:6,border:nbPixelSize==="custom"?"1px solid rgba(254,202,87,.5)":"1px solid rgba(255,255,255,.08)",
-              background:nbPixelSize==="custom"?"rgba(254,202,87,.12)":"rgba(255,255,255,.03)",color:nbPixelSize==="custom"?"#feca57":"#888",fontSize:10,fontWeight:700,cursor:"pointer"}}>✏️<div style={{fontSize:9,opacity:.5}}>Custom</div></button>
-        </div>
-        {nbPixelSize==="custom"&&<div style={{display:"flex",gap:4,alignItems:"center",marginTop:6}}>
-          <input value={customPixelW} onChange={e=>setCustomPixelW(e.target.value.replace(/\D/g,""))} placeholder="W" style={{width:56,padding:"5px 8px",borderRadius:6,border:"1px solid rgba(254,202,87,.3)",background:"rgba(254,202,87,.06)",color:"#feca57",fontSize:13,fontWeight:700,textAlign:"center",outline:"none"}}/>
-          <span style={{color:"#888",fontSize:13}}>×</span>
-          <input value={customPixelH} onChange={e=>setCustomPixelH(e.target.value.replace(/\D/g,""))} placeholder="H" style={{width:56,padding:"5px 8px",borderRadius:6,border:"1px solid rgba(254,202,87,.3)",background:"rgba(254,202,87,.06)",color:"#feca57",fontSize:13,fontWeight:700,textAlign:"center",outline:"none"}}/>
-          <span style={{fontSize:10,opacity:.3}}>max 512</span>
-        </div>}
-      </div>}
       <button onClick={()=>{const title=nbNewTitle.trim()||`Page ${nbData.pages.length+1}`;
         const actualType=nbNewType==="art"?nbNewArtStyle:nbNewType;
         const np={title,type:actualType,content:"",drawData:null,pixels:{},created:Date.now()};
         if(actualType==="pixel"){
-          if(nbPixelSize==="custom"){const w=Math.max(4,Math.min(512,Number(customPixelW)||32));const h=Math.max(4,Math.min(512,Number(customPixelH)||32));np.pixelSize=`${w}x${h}`;}
-          else np.pixelSize=nbPixelSize;
+          np.pixelSize="32x32";
         }
         const d=readNb();d.pages.push(np);saveNb(d);setNbNewTitle("");
         const newIdx=d.pages.length-1;pageIdxRef.current=newIdx;
