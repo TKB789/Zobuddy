@@ -7140,7 +7140,31 @@ const NotebookPanel=()=>{
       const finalVotes=new Map();
       for(let i=0;i<clean.length;i++){const v=clean[i];if(v!==65535)finalVotes.set(v,(finalVotes.get(v)||0)+1);}
       const colorInfo=[...finalVotes.entries()].sort((a,b)=>b[1]-a[1]).map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
-      callback({svg,width:w,height:h,colors:colorInfo,pngUrl});
+      // ── Connected-component region detection for paint-by-number ──
+      // Find distinct regions of same color, store centroid of each large region
+      const visited=new Uint8Array(w*h);
+      const regionData=[]; // [{ci, cx, cy, size}]
+      const minRegionPx=Math.max(20,Math.round(w*h/2000)); // skip tiny regions
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const idx=y*w+x;
+        if(visited[idx]||clean[idx]===65535)continue;
+        const ci=clean[idx];
+        // BFS flood fill
+        const queue=[idx];visited[idx]=1;
+        let sx=0,sy=0,count=0;
+        while(queue.length>0){
+          const cur=queue.pop();const cy2=Math.floor(cur/w),cx2=cur%w;
+          sx+=cx2;sy+=cy2;count++;
+          const neighbors=[cur-1,cur+1,cur-w,cur+w];
+          for(const ni of neighbors){
+            if(ni>=0&&ni<w*h&&!visited[ni]&&clean[ni]===ci){visited[ni]=1;queue.push(ni);}
+          }
+        }
+        if(count>=minRegionPx){
+          regionData.push({ci,cx:Math.round(sx/count),cy:Math.round(sy/count),size:count});
+        }
+      }
+      callback({svg,width:w,height:h,colors:colorInfo,pngUrl,regionData});
       }catch(err){alert("Error: "+err.message);callback(null);}
     };img.src=imgSrc;
   };
@@ -7168,7 +7192,7 @@ const NotebookPanel=()=>{
         setVecImporting(false);if(!result)return;
         vecSvgRef.current=result.svg;
         const d=readNb();const pi=pageIdxRef.current;
-        if(d.pages?.[pi]){d.pages[pi].vectorPng=result.pngUrl||"";d.pages[pi].vectorColors=result.colors;d.pages[pi].vecDrawData=null;d.pages[pi].vectorOriginal=canvasToJpeg(cc,0.6);delete d.pages[pi].vectorSvg;
+        if(d.pages?.[pi]){d.pages[pi].vectorPng=result.pngUrl||"";d.pages[pi].vectorColors=result.colors;d.pages[pi].vecDrawData=null;d.pages[pi].vectorOriginal=canvasToJpeg(cc,0.6);d.pages[pi].vectorRegions=result.regionData||null;delete d.pages[pi].vectorSvg;
           try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
       });
     };ci2.src=src;
@@ -7311,6 +7335,7 @@ const NotebookPanel=()=>{
       });
       // Second pass: render triangles with remapped colors
       const finalVotes2=new Map();
+      const triGeo=[]; // Store triangle geometry for paint-by-number printing
       tris.forEach((t,ti)=>{
         const pa=gridPts[t.a],pb=gridPts[t.b],pc=gridPts[t.c];
         const ci=triColors[ti];if(ci<0)return;
@@ -7318,11 +7343,15 @@ const NotebookPanel=()=>{
         finalVotes2.set(remapped,(finalVotes2.get(remapped)||0)+1);
         octx.fillStyle=fullPal[remapped];octx.strokeStyle=fullPal[remapped];octx.lineWidth=0.5;octx.lineJoin="round";
         octx.beginPath();octx.moveTo(pa.x,pa.y);octx.lineTo(pb.x,pb.y);octx.lineTo(pc.x,pc.y);octx.closePath();octx.fill();octx.stroke();
+        // Store: centroid + area + color index for numbering
+        const cx2=(pa.x+pb.x+pc.x)/3, cy2=(pa.y+pb.y+pc.y)/3;
+        const area=Math.abs((pb.x-pa.x)*(pc.y-pa.y)-(pc.x-pa.x)*(pb.y-pa.y))/2;
+        triGeo.push({cx:Math.round(cx2*10)/10,cy:Math.round(cy2*10)/10,a:Math.round(area),ci:remapped});
       });
       const pngUrl=outCanvas.toDataURL("image/jpeg",0.85);
       const topColors=[...finalVotes2.entries()].sort((a,b)=>b[1]-a[1]);
       const colorInfo=topColors.map(([ci,count])=>({color:fullPal[ci],dmc:PIXEL_PALETTE[ci],count}));
-      callback({pngUrl,width:w,height:h,colors:colorInfo});
+      callback({pngUrl,width:w,height:h,colors:colorInfo,triGeo});
       }catch(err){alert("Error: "+err.message);callback(null);}
     };img.src=imgSrc;
   };
@@ -7349,7 +7378,7 @@ const NotebookPanel=()=>{
       generatePolyArt(cc.toDataURL("image/png"),polyDensity,polyPendingColors.current,(result)=>{
         setPolyImporting(false);if(!result)return;
         const d=readNb();const pi=pageIdxRef.current;
-        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;d.pages[pi].polyOriginal=canvasToJpeg(cc,0.6);
+        if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;d.pages[pi].polyOriginal=canvasToJpeg(cc,0.6);d.pages[pi].polyTriGeo=result.triGeo||null;d.pages[pi].polyW=result.width;d.pages[pi].polyH=result.height;
           try{writeNb(d);setNbData({...d});}catch(err){alert("Save failed — try fewer colors.");}}
       });
     };ci2.src=src;
@@ -7405,54 +7434,138 @@ const NotebookPanel=()=>{
       if(!imgSrc)return;
       const showNums=confirm("Include color numbers on the printout?");
       const legendHtml=vc.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:16px;height:16px;border-radius:3px;background:${c.color};border:1px solid #ccc;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:${(parseInt(c.color.slice(1,3),16)*.299+parseInt(c.color.slice(3,5),16)*.587+parseInt(c.color.slice(5,7),16)*.114)>128?'#000':'#fff'}">${i+1}</span><b>#${i+1}</b> DMC ${c.dmc?.n||"?"} ${c.dmc?.nm||""}</span>`).join("");
-      if(!showNums){
+      const openPrintWindow=(imgUrl)=>{
         const win=window.open("","_blank");
-        if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgSrc}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
-        return;
-      }
-      // Generate numbered overlay: scan the image pixels, find regions of each color, place numbers
+        if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgUrl}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+      };
+      if(!showNums){openPrintWindow(imgSrc);return;}
+      // ── Build color index: palette color → number ──
+      const htr2=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+      const colorToNum=new Map();
+      vc.forEach((c,i)=>{colorToNum.set(c.color.toLowerCase(),i+1);});
+      // Helper: find nearest palette color for an RGB value
+      const palRgb=vc.map(c=>({color:c.color.toLowerCase(),rgb:htr2(c.color)}));
+      const nearestPalIdx=(cr,cg,cb)=>{let bd=Infinity,bi=0;palRgb.forEach((p,i)=>{const d=(cr-p.rgb[0])**2+(cg-p.rgb[1])**2+(cb-p.rgb[2])**2;if(d<bd){bd=d;bi=i;}});return bi;};
+      // Load the art image to draw on
       const artImg=new Image();artImg.onload=()=>{
         const w=artImg.width,h=artImg.height;
-        const tc2=document.createElement("canvas");tc2.width=w;tc2.height=h;
-        const tctx2=tc2.getContext("2d");tctx2.drawImage(artImg,0,0);
-        const imgData2=tctx2.getImageData(0,0,w,h).data;
-        // Build color map: for each color in the palette, find all pixel positions
-        const colorMap=new Map();
-        vc.forEach((c,i)=>{colorMap.set(c.color.toLowerCase(),{idx:i+1,positions:[]});});
-        // Scan pixels and match to nearest palette color
-        const htr2=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
-        const palRgb=vc.map(c=>({color:c.color.toLowerCase(),rgb:htr2(c.color)}));
-        for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-          const idx4=(y*w+x)*4;const r2=imgData2[idx4],g2=imgData2[idx4+1],b2=imgData2[idx4+2];
-          let bestD=Infinity,bestC=null;
-          palRgb.forEach(p=>{const d2=(r2-p.rgb[0])**2+(g2-p.rgb[1])**2+(b2-p.rgb[2])**2;if(d2<bestD){bestD=d2;bestC=p.color;}});
-          if(bestC&&colorMap.has(bestC))colorMap.get(bestC).positions.push({x,y});
+        // Scale up for crisp printing (target ~2400px on longest side)
+        const printScale=Math.max(1,Math.min(4,Math.round(2400/Math.max(w,h))));
+        const pw=w*printScale,ph=h*printScale;
+        const tc2=document.createElement("canvas");tc2.width=pw;tc2.height=ph;
+        const tctx2=tc2.getContext("2d");
+        tctx2.imageSmoothingEnabled=false;
+        tctx2.drawImage(artImg,0,0,pw,ph);
+        if(artStyle==="poly"&&pg.polyTriGeo&&pg.polyTriGeo.length>0){
+          // ═══ POLY ART: Use stored triangle geometry for crisp numbers ═══
+          const triGeo=pg.polyTriGeo;
+          const imgW=pg.polyW||w, imgH=pg.polyH||h;
+          const sx=pw/imgW, sy=ph/imgH;
+          // Build palette index from stored color indices
+          const fullPal=PIXEL_PALETTE.map(p=>p.c);
+          // Group triangles by color, pick the largest triangle per color for number placement
+          // Also place numbers in additional large triangles for coverage
+          const colorGroups=new Map();
+          triGeo.forEach(t=>{
+            if(!colorGroups.has(t.ci))colorGroups.set(t.ci,[]);
+            colorGroups.get(t.ci).push(t);
+          });
+          const fontSize2=Math.max(12,Math.round(Math.min(pw,ph)/35));
+          tctx2.font=`bold ${fontSize2}px sans-serif`;tctx2.textAlign="center";tctx2.textBaseline="middle";
+          colorGroups.forEach((triangles,ci)=>{
+            const palColor=(ci<fullPal.length)?fullPal[ci]:"#888";
+            const num=colorToNum.get(palColor.toLowerCase());
+            if(!num)return;
+            // Sort by area descending, place number in largest triangles
+            triangles.sort((a,b)=>b.a-a.a);
+            // Place in every Nth large triangle for good coverage
+            const totalArea=triangles.reduce((s,t)=>s+t.a,0);
+            const minAreaForLabel=Math.max(totalArea*0.005,200);
+            let placed=0;
+            for(let i=0;i<triangles.length&&placed<Math.max(1,Math.ceil(triangles.length/15));i++){
+              const t=triangles[i];
+              if(t.a<minAreaForLabel&&placed>0)break;
+              const cx=t.cx*sx, cy=t.cy*sy;
+              const lum=parseInt(palColor.slice(1,3),16)*.299+parseInt(palColor.slice(3,5),16)*.587+parseInt(palColor.slice(5,7),16)*.114;
+              const numStr=String(num);
+              // Adaptive font size based on triangle area
+              const triFs=Math.max(9,Math.min(fontSize2,Math.round(Math.sqrt(t.a*sx*sy)*0.35)));
+              tctx2.font=`bold ${triFs}px sans-serif`;
+              tctx2.strokeStyle=lum>128?"rgba(0,0,0,.8)":"rgba(255,255,255,.8)";tctx2.lineWidth=Math.max(2,triFs/4);
+              tctx2.strokeText(numStr,cx,cy);
+              tctx2.fillStyle=lum>128?"#000":"#fff";
+              tctx2.fillText(numStr,cx,cy);
+              placed++;
+            }
+          });
+        } else if(artStyle==="vector"&&pg.vectorRegions&&pg.vectorRegions.length>0){
+          // ═══ FLAT ART: Use stored region centroids for crisp numbers ═══
+          const regions=pg.vectorRegions;
+          const fullPal=PIXEL_PALETTE.map(p=>p.c);
+          // Scale factor: regions were computed at generation resolution
+          // The image might have been saved at different resolution, so scale by pw/original
+          const fontSize2=Math.max(12,Math.round(Math.min(pw,ph)/35));
+          tctx2.font=`bold ${fontSize2}px sans-serif`;tctx2.textAlign="center";tctx2.textBaseline="middle";
+          // Group regions by color, sort by size
+          const colorGroups=new Map();
+          regions.forEach(r=>{
+            if(!colorGroups.has(r.ci))colorGroups.set(r.ci,[]);
+            colorGroups.get(r.ci).push(r);
+          });
+          colorGroups.forEach((regs,ci)=>{
+            const palColor=(ci<fullPal.length)?fullPal[ci]:"#888";
+            const num=colorToNum.get(palColor.toLowerCase());
+            if(!num)return;
+            regs.sort((a,b)=>b.size-a.size);
+            const totalPx=regs.reduce((s,r)=>s+r.size,0);
+            const minPxForLabel=Math.max(totalPx*0.02,100);
+            let placed=0;
+            for(let i=0;i<regs.length&&placed<Math.max(1,Math.ceil(regs.length/8));i++){
+              const r=regs[i];
+              if(r.size<minPxForLabel&&placed>0)break;
+              // Scale centroid from generation coords to print coords
+              const cx=r.cx*printScale, cy=r.cy*printScale;
+              const lum=parseInt(palColor.slice(1,3),16)*.299+parseInt(palColor.slice(3,5),16)*.587+parseInt(palColor.slice(5,7),16)*.114;
+              const numStr=String(num);
+              const regFs=Math.max(10,Math.min(fontSize2,Math.round(Math.sqrt(r.size*printScale*printScale)*0.04)));
+              tctx2.font=`bold ${regFs}px sans-serif`;
+              tctx2.strokeStyle=lum>128?"rgba(0,0,0,.8)":"rgba(255,255,255,.8)";tctx2.lineWidth=Math.max(2,regFs/4);
+              tctx2.strokeText(numStr,cx,cy);
+              tctx2.fillStyle=lum>128?"#000":"#fff";
+              tctx2.fillText(numStr,cx,cy);
+              placed++;
+            }
+          });
+        } else {
+          // ═══ FALLBACK: Old pixel-scanning approach for art without stored geometry ═══
+          const imgData2=tctx2.getImageData(0,0,pw,ph).data;
+          const colorMap=new Map();
+          vc.forEach((c,i)=>{colorMap.set(c.color.toLowerCase(),{idx:i+1,positions:[]});});
+          for(let y=0;y<ph;y+=printScale)for(let x=0;x<pw;x+=printScale){
+            const idx4=(y*pw+x)*4;const r2=imgData2[idx4],g2=imgData2[idx4+1],b2=imgData2[idx4+2];
+            const bi=nearestPalIdx(r2,g2,b2);
+            const col=palRgb[bi]?.color;
+            if(col&&colorMap.has(col))colorMap.get(col).positions.push({x,y});
+          }
+          const fontSize2=Math.max(12,Math.round(Math.min(pw,ph)/35));
+          tctx2.font=`bold ${fontSize2}px sans-serif`;tctx2.textAlign="center";tctx2.textBaseline="middle";
+          colorMap.forEach((data,color)=>{
+            if(data.positions.length===0)return;
+            const gridSize=Math.max(30,Math.round(Math.min(pw,ph)/8));
+            const cells=new Map();
+            data.positions.forEach(p=>{const gk=Math.floor(p.x/gridSize)+","+Math.floor(p.y/gridSize);
+              if(!cells.has(gk))cells.set(gk,{sx:0,sy:0,count:0});const c2=cells.get(gk);c2.sx+=p.x;c2.sy+=p.y;c2.count++;});
+            let bestCell=null;cells.forEach(c2=>{if(!bestCell||c2.count>bestCell.count)bestCell=c2;});
+            if(!bestCell)return;
+            const cx=Math.round(bestCell.sx/bestCell.count),cy=Math.round(bestCell.sy/bestCell.count);
+            const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
+            tctx2.strokeStyle=lum>128?"rgba(0,0,0,.7)":"rgba(255,255,255,.7)";tctx2.lineWidth=Math.max(2,fontSize2/4);
+            tctx2.strokeText(String(data.idx),cx,cy);
+            tctx2.fillStyle=lum>128?"#000":"#fff";
+            tctx2.fillText(String(data.idx),cx,cy);
+          });
         }
-        // For each color, find centroid of largest connected region using grid sampling
-        const fontSize2=Math.max(10,Math.round(Math.min(w,h)/40));
-        tctx2.font=`bold ${fontSize2}px sans-serif`;tctx2.textAlign="center";tctx2.textBaseline="middle";
-        colorMap.forEach((data,color)=>{
-          if(data.positions.length===0)return;
-          // Grid-sample centroids: divide positions into a grid, find the cell with most pixels
-          const gridSize=Math.max(20,Math.round(Math.min(w,h)/8));
-          const cells=new Map();
-          data.positions.forEach(p=>{const gx=Math.floor(p.x/gridSize),gy=Math.floor(p.y/gridSize);const gk=gx+","+gy;
-            if(!cells.has(gk))cells.set(gk,{sx:0,sy:0,count:0});const c2=cells.get(gk);c2.sx+=p.x;c2.sy+=p.y;c2.count++;});
-          // Find largest cell
-          let bestCell=null;cells.forEach(c2=>{if(!bestCell||c2.count>bestCell.count)bestCell=c2;});
-          if(!bestCell)return;
-          const cx=Math.round(bestCell.sx/bestCell.count),cy=Math.round(bestCell.sy/bestCell.count);
-          const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
-          // Draw number with outline for readability
-          const numStr=String(data.idx);
-          tctx2.strokeStyle=lum>128?"rgba(0,0,0,.7)":"rgba(255,255,255,.7)";tctx2.lineWidth=Math.max(2,fontSize2/4);
-          tctx2.strokeText(numStr,cx,cy);
-          tctx2.fillStyle=lum>128?"#000":"#fff";
-          tctx2.fillText(numStr,cx,cy);
-        });
-        const numberedUrl=tc2.toDataURL("image/png");
-        const win=window.open("","_blank");
-        if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${numberedUrl}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
+        openPrintWindow(tc2.toDataURL("image/png"));
       };artImg.src=imgSrc;
     };
     // Convert handler (shared concept)
