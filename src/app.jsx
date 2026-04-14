@@ -6215,7 +6215,7 @@ const NotebookPanel=()=>{
   const[drawEraserSize,setDrawEraserSize]=useState(20);
   const[showDrawPicker,setShowDrawPicker]=useState(false);
   const[drawPaletteSearch,setDrawPaletteSearch]=useState("");
-  const[pixelColor,setPixelColor]=useState("#f5576c");
+  const[pixelColor,setPixelColor]=useState("#C7252C"); // DMC 321 — first in default palette
   const[pixelEraser,setPixelEraser]=useState(false);
   const[pixEyedropper,setPixEyedropper]=useState(false);
   const pixEyedropperRef2=React.useRef(false);
@@ -7194,7 +7194,7 @@ const NotebookPanel=()=>{
         vecSvgRef.current=result.svg;
         const d=readNb();const pi=pageIdxRef.current;
         if(d.pages?.[pi]){d.pages[pi].vectorPng=result.pngUrl||"";d.pages[pi].vectorColors=result.colors;d.pages[pi].vecDrawData=null;d.pages[pi].vectorOriginal=canvasToJpeg(cc,0.6);d.pages[pi].vectorRegions=result.regionData||null;delete d.pages[pi].vectorSvg;
-          try{writeNb(d);setNbData(JSON.parse(JSON.stringify(d)));}catch(err){alert("Save failed — try fewer colors.");}}
+          try{writeNb(d);setNbData({...d,pages:d.pages.map((p,i)=>i===pi?{...p}:p)});}catch(err){alert("Save failed — try fewer colors.");}}
       });
     };ci2.src=src;
   };
@@ -7380,7 +7380,7 @@ const NotebookPanel=()=>{
         setPolyImporting(false);if(!result)return;
         const d=readNb();const pi=pageIdxRef.current;
         if(d.pages?.[pi]){d.pages[pi].polyPng=result.pngUrl;d.pages[pi].polyColors=result.colors;d.pages[pi].polyOriginal=canvasToJpeg(cc,0.6);d.pages[pi].polyTriGeo=result.triGeo||null;d.pages[pi].polyW=result.width;d.pages[pi].polyH=result.height;
-          try{writeNb(d);setNbData(JSON.parse(JSON.stringify(d)));}catch(err){alert("Save failed — try fewer colors.");}}
+          try{writeNb(d);setNbData({...d,pages:d.pages.map((p,i)=>i===pi?{...p}:p)});}catch(err){alert("Save failed — try fewer colors.");}}
       });
     };ci2.src=src;
   };
