@@ -7439,75 +7439,84 @@ const NotebookPanel=()=>{
         if(win){win.document.write(`<html><head><title>${(page.title||"Art").replace(/</g,"&lt;")}</title><style>@media print{body{margin:0}.no-print{display:none!important}}body{font-family:sans-serif;margin:0;padding:12px;display:flex;flex-direction:column;align-items:center}img{max-width:100%;height:auto}</style></head><body><h3 style="margin:4px 0">${(page.title||"Art").replace(/</g,"&lt;")}</h3><img src="${imgUrl}" style="max-width:100%;height:auto"/><div style="margin:8px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:10px">${legendHtml}</div><div class="no-print"><button onclick="window.print()" style="padding:10px 24px;font-size:15px;cursor:pointer;border-radius:8px;border:1px solid #ccc">🖨️ Print / Save PDF</button></div></body></html>`);win.document.close();}
       };
       if(!showNums){openPrintWindow(imgSrc);return;}
-      // ── Build vc color → label number map (vc index) ──
       const htr2=hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
       const vcRgb=vc.map(c=>htr2(c.color));
-      // Map any RGB pixel to the nearest vc palette entry INDEX (0-based), returns {idx, color}
-      const nearestVcIdx=(r,g,b)=>{let bd=Infinity,bi=0;vcRgb.forEach(([pr,pg,pb],i)=>{const d2=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d2<bd){bd=d2;bi=i;}});return bi;};
-      // Helper to draw a number label
-      const drawNum=(ctx,num,cx,cy,color,fs)=>{
-        const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
-        ctx.font=`bold ${fs}px sans-serif`;
-        ctx.strokeStyle=lum>128?"rgba(0,0,0,.85)":"rgba(255,255,255,.85)";ctx.lineWidth=Math.max(2.5,fs/3.5);
-        ctx.strokeText(String(num),cx,cy);
-        ctx.fillStyle=lum>128?"#000":"#fff";
-        ctx.fillText(String(num),cx,cy);
-      };
+      const nearVc=(r,g,b)=>{let bd=Infinity,bi=0;vcRgb.forEach(([pr,pg,pb],i)=>{const d2=(r-pr)**2+(g-pg)**2+(b-pb)**2;if(d2<bd){bd=d2;bi=i;}});return bi;};
       const artImg=new Image();artImg.onload=()=>{
         const w=artImg.width,h=artImg.height;
-        const printScale=Math.max(1,Math.min(4,Math.round(2400/Math.max(w,h))));
-        const pw=w*printScale,ph=h*printScale;
-        const tc2=document.createElement("canvas");tc2.width=pw;tc2.height=ph;
-        const tctx2=tc2.getContext("2d");
-        tctx2.imageSmoothingEnabled=false;
-        tctx2.drawImage(artImg,0,0,pw,ph);
-        tctx2.textAlign="center";tctx2.textBaseline="middle";
-        // ── Quantize the image pixels to vc palette indices ──
-        // Work at original resolution for speed, scale centroids to print res
-        const qCanvas=document.createElement("canvas");qCanvas.width=w;qCanvas.height=h;
-        const qCtx=qCanvas.getContext("2d");qCtx.drawImage(artImg,0,0,w,h);
+        // Work at original resolution for region detection
+        const qCtx=(()=>{const c=document.createElement("canvas");c.width=w;c.height=h;const x=c.getContext("2d");x.drawImage(artImg,0,0);return x;})();
         const qData=qCtx.getImageData(0,0,w,h).data;
-        const qGrid=new Uint8Array(w*h); // vc palette index per pixel
+        // Step 1: Quantize every pixel to nearest vc palette index
+        const grid=new Uint8Array(w*h);
+        for(let i=0;i<w*h;i++){const i4=i*4;grid[i]=nearVc(qData[i4],qData[i4+1],qData[i4+2]);}
+        // Step 2: Find contour borders — pixels where any neighbor has a different color
+        const isBorder=new Uint8Array(w*h);
         for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-          const i4=(y*w+x)*4;
-          qGrid[y*w+x]=nearestVcIdx(qData[i4],qData[i4+1],qData[i4+2]);
+          const ci=grid[y*w+x];
+          if((x>0&&grid[y*w+x-1]!==ci)||(x<w-1&&grid[y*w+x+1]!==ci)||(y>0&&grid[(y-1)*w+x]!==ci)||(y<h-1&&grid[(y+1)*w+x]!==ci)){
+            isBorder[y*w+x]=1;
+          }
         }
-        // ── Connected-component flood fill ──
-        // Find every distinct contiguous region of same vc-color
+        // Step 3: Compute distance-from-border for every pixel (BFS from border pixels)
+        const dist=new Uint16Array(w*h); // distance from nearest border
+        const bfsQ=[];
+        for(let i=0;i<w*h;i++){if(isBorder[i]){dist[i]=0;bfsQ.push(i);}else{dist[i]=65535;}}
+        let qi=0;
+        while(qi<bfsQ.length){
+          const cur=bfsQ[qi++];const cd=dist[cur];const nd=cd+1;
+          const cy2=Math.floor(cur/w),cx2=cur%w;
+          const neighbors=[];
+          if(cx2>0)neighbors.push(cur-1);if(cx2<w-1)neighbors.push(cur+1);
+          if(cy2>0)neighbors.push(cur-w);if(cy2<h-1)neighbors.push(cur+w);
+          for(const ni of neighbors){if(nd<dist[ni]){dist[ni]=nd;bfsQ.push(ni);}}
+        }
+        // Step 4: Connected-component flood fill to find regions
         const visited=new Uint8Array(w*h);
-        const regions=[]; // [{vcIdx, cx, cy, size}]
-        const minPx=Math.max(6,Math.round(w*h/4000));
+        const regions=[]; // [{vcIdx, bestX, bestY, bestDist, size}]
+        const minPx=Math.max(4,Math.round(w*h/5000));
         for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-          const idx=y*w+x;
-          if(visited[idx])continue;
-          const ci=qGrid[idx];
+          const idx=y*w+x;if(visited[idx])continue;
+          const ci=grid[idx];
           const stack=[idx];visited[idx]=1;
-          let sx=0,sy=0,cnt=0;
+          let bestDist=0,bestX=x,bestY=y,cnt=0;
           while(stack.length>0){
-            const cur=stack.pop();const cy2=Math.floor(cur/w),cx2=cur%w;
-            sx+=cx2;sy+=cy2;cnt++;
-            if(cx2>0&&!visited[cur-1]&&qGrid[cur-1]===ci){visited[cur-1]=1;stack.push(cur-1);}
-            if(cx2<w-1&&!visited[cur+1]&&qGrid[cur+1]===ci){visited[cur+1]=1;stack.push(cur+1);}
-            if(cy2>0&&!visited[cur-w]&&qGrid[cur-w]===ci){visited[cur-w]=1;stack.push(cur-w);}
-            if(cy2<h-1&&!visited[cur+w]&&qGrid[cur+w]===ci){visited[cur+w]=1;stack.push(cur+w);}
+            const cur=stack.pop();const cy2=Math.floor(cur/w),cx2=cur%w;cnt++;
+            // Track the pixel farthest from any border — that's the best label position
+            if(dist[cur]>bestDist){bestDist=dist[cur];bestX=cx2;bestY=cy2;}
+            if(cx2>0&&!visited[cur-1]&&grid[cur-1]===ci){visited[cur-1]=1;stack.push(cur-1);}
+            if(cx2<w-1&&!visited[cur+1]&&grid[cur+1]===ci){visited[cur+1]=1;stack.push(cur+1);}
+            if(cy2>0&&!visited[cur-w]&&grid[cur-w]===ci){visited[cur-w]=1;stack.push(cur-w);}
+            if(cy2<h-1&&!visited[cur+w]&&grid[cur+w]===ci){visited[cur+w]=1;stack.push(cur+w);}
           }
-          if(cnt>=minPx){
-            regions.push({vcIdx:ci,cx:sx/cnt,cy:sy/cnt,size:cnt});
-          }
+          if(cnt>=minPx){regions.push({vcIdx:ci,x:bestX,y:bestY,d:bestDist,size:cnt});}
         }
-        // ── Draw numbers: one per region, sized to fit ──
-        const baseFontSize=Math.max(11,Math.round(Math.min(pw,ph)/30));
-        regions.sort((a,b)=>b.size-a.size); // draw largest first
+        // Step 5: Draw on high-res print canvas
+        const ps=Math.max(1,Math.min(4,Math.round(2400/Math.max(w,h))));
+        const pw=w*ps,ph=h*ps;
+        const tc=document.createElement("canvas");tc.width=pw;tc.height=ph;
+        const tctx=tc.getContext("2d");tctx.imageSmoothingEnabled=false;
+        tctx.drawImage(artImg,0,0,pw,ph);
+        tctx.textAlign="center";tctx.textBaseline="middle";
+        // Sort by size descending so large regions get drawn first
+        regions.sort((a,b)=>b.size-a.size);
+        const baseFontSize=Math.max(10,Math.round(Math.min(pw,ph)/28));
         for(const r of regions){
-          const num=r.vcIdx+1; // 1-indexed to match legend
+          const num=r.vcIdx+1;
           const color=vc[r.vcIdx]?.color||"#888";
-          // Scale centroid from original coords to print coords
-          const cx=r.cx*printScale, cy=r.cy*printScale;
-          // Font size proportional to region area
-          const fs=Math.max(8,Math.min(baseFontSize,Math.round(Math.sqrt(r.size)*0.6*printScale)));
-          drawNum(tctx2,num,cx,cy,color,fs);
+          const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
+          // Font size proportional to distance from border (so it fits inside the region)
+          const fs=Math.max(7,Math.min(baseFontSize,Math.round(r.d*ps*0.9)));
+          if(fs<7)continue; // too tiny to read
+          const cx=r.x*ps+ps/2, cy=r.y*ps+ps/2;
+          tctx.font=`bold ${fs}px sans-serif`;
+          tctx.strokeStyle=lum>128?"rgba(0,0,0,.9)":"rgba(255,255,255,.9)";
+          tctx.lineWidth=Math.max(2,fs/3);
+          tctx.strokeText(String(num),cx,cy);
+          tctx.fillStyle=lum>128?"#111":"#fff";
+          tctx.fillText(String(num),cx,cy);
         }
-        openPrintWindow(tc2.toDataURL("image/png"));
+        openPrintWindow(tc.toDataURL("image/png"));
       };artImg.src=imgSrc;
     };
     // Convert handler (shared concept)
@@ -7893,12 +7902,16 @@ const NotebookPanel=()=>{
                   <span style={{fontSize:7,fontWeight:800,color:lum>128?"rgba(0,0,0,.6)":"rgba(255,255,255,.7)",lineHeight:1,textAlign:"center"}}>{pm?pm.n:""}</span>
                 </div>);});
               }
-              return ["#000000","#ffffff","#C72B3B","#13477D","#056517","#FF8313","#5C184E","#feca57","#8C8C8C"].map(c=>{
-                const lum=parseInt(c.slice(1,3),16)*.299+parseInt(c.slice(3,5),16)*.587+parseInt(c.slice(5,7),16)*.114;
-                const pm=PIXEL_PALETTE.find(p2=>p2.c===c);
-                return(<div key={c} onClick={()=>{setVecDrawColor(c);setVecDrawEraser(false);setVecEyedropper(false);}}
-                  style={{...cSwatch(c,vecDrawColor===c&&!vecDrawEraser,30),display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <span style={{fontSize:7,fontWeight:800,color:lum>128?"rgba(0,0,0,.6)":"rgba(255,255,255,.7)",lineHeight:1}}>{pm?pm.n:""}</span>
+              return [
+                PIXEL_PALETTE.find(p=>p.n==="321"),PIXEL_PALETTE.find(p=>p.n==="797"),PIXEL_PALETTE.find(p=>p.n==="973"),
+                PIXEL_PALETTE.find(p=>p.n==="699"),PIXEL_PALETTE.find(p=>p.n==="740"),PIXEL_PALETTE.find(p=>p.n==="550"),
+                PIXEL_PALETTE.find(p=>p.n==="310"),PIXEL_PALETTE.find(p=>p.n==="414"),PIXEL_PALETTE.find(p=>p.n==="Blanc")
+              ].filter(Boolean).map(p=>{
+                const lum=parseInt(p.c.slice(1,3),16)*.299+parseInt(p.c.slice(3,5),16)*.587+parseInt(p.c.slice(5,7),16)*.114;
+                return(<div key={p.n+"v"} onClick={()=>{setVecDrawColor(p.c);setVecDrawEraser(false);setVecEyedropper(false);}}
+                  title={`DMC ${p.n} ${p.nm}`}
+                  style={{...cSwatch(p.c,vecDrawColor===p.c&&!vecDrawEraser,30),display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:7,fontWeight:800,color:lum>128?"rgba(0,0,0,.6)":"rgba(255,255,255,.7)",lineHeight:1}}>{p.n}</span>
                 </div>);});
             })()}
             <button onClick={()=>{setShowPixPicker(v=>!v);setPixPaletteSearch("");}} style={tbtn({padding:"6px 10px",fontSize:11,color:showPixPicker?"#feca57":"#888"})}>{showPixPicker?"▼":"🎨"}</button>
