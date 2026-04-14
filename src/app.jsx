@@ -8499,7 +8499,7 @@ function CleanRoomAccordion({room,d,roomDone,isTodayRoom,toggleWeekly,weekKey,ch
     <div style={{borderBottom:"1px solid rgba(255,255,255,.05)"}}>
       <div onClick={()=>setOpen(!open)}
         style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",cursor:"pointer",background:isTodayRoom?"rgba(102,126,234,.08)":"transparent"}}>
-        <span style={{fontSize:13,fontWeight:900,color:"#667eea",letterSpacing:.5,opacity:isTodayRoom?1:.6}}>{room.day.toUpperCase()}</span>
+        <span style={{fontSize:13,fontWeight:900,color:"#667eea",letterSpacing:.5,opacity:isTodayRoom?1:.6,width:36,minWidth:36,display:"inline-block"}}>{room.day.toUpperCase()}</span>
         <span style={{fontSize:15,fontWeight:800,color:isTodayRoom?"#e8e0f0":"rgba(255,255,255,.7)",flex:1}}>{room.room}</span>
         {isTodayRoom&&<span style={{fontSize:10,background:"rgba(102,126,234,.2)",color:"#a8b4f0",padding:"1px 6px",borderRadius:4,fontWeight:800}}>TODAY</span>}
         <span style={{fontSize:13,color:roomDone===room.tasks.length?"#43e97b":"rgba(255,255,255,.3)",fontWeight:700}}>{roomDone}/{room.tasks.length}</span>
@@ -8524,7 +8524,7 @@ function WoRoomAccordion({day,d,dayDone,isTodayRoom,toggleWoWeekly,weekKey,check
     <div style={{marginBottom:4}}>
       <div onClick={()=>setOpen(!open)}
         style={{display:"flex",alignItems:"center",gap:6,padding:"7px 8px",cursor:"pointer",background:isTodayRoom?"rgba(102,126,234,.08)":"transparent",borderRadius:6}}>
-        <span style={{fontSize:13,fontWeight:900,color:day.color||"#a78bfa",letterSpacing:.5}}>{day.day.toUpperCase()}</span>
+        <span style={{fontSize:13,fontWeight:900,color:day.color||"#a78bfa",letterSpacing:.5,width:36,minWidth:36,display:"inline-block"}}>{day.day.toUpperCase()}</span>
         <span style={{fontSize:15,fontWeight:800,color:isTodayRoom?"#e8e0f0":"rgba(255,255,255,.7)",flex:1}}>{day.focus}</span>
         {isTodayRoom&&<span style={{fontSize:10,background:"rgba(102,126,234,.2)",color:"#a8b4f0",padding:"1px 6px",borderRadius:4,fontWeight:800}}>TODAY</span>}
         <span style={{fontSize:13,color:dayDone===day.exercises.length?"#43e97b":"rgba(255,255,255,.3)",fontWeight:700}}>{dayDone}/{day.exercises.length}</span>
