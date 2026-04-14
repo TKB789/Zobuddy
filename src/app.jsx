@@ -7500,20 +7500,21 @@ const NotebookPanel=()=>{
         tctx.textAlign="center";tctx.textBaseline="middle";
         // Sort by size descending so large regions get drawn first
         regions.sort((a,b)=>b.size-a.size);
-        const baseFontSize=Math.max(10,Math.round(Math.min(pw,ph)/28));
         for(const r of regions){
           const num=r.vcIdx+1;
           const color=vc[r.vcIdx]?.color||"#888";
           const lum=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114;
-          // Font size proportional to distance from border (so it fits inside the region)
-          const fs=Math.max(7,Math.min(baseFontSize,Math.round(r.d*ps*0.9)));
-          if(fs<7)continue; // too tiny to read
+          // Fixed font size range: 8-12px, skip if region too small to fit even 8px
+          const maxFit=Math.floor(r.d*ps*0.8); // max font that fits inside the region
+          if(maxFit<8)continue;
+          const fs=Math.min(12,Math.max(8,maxFit));
           const cx=r.x*ps+ps/2, cy=r.y*ps+ps/2;
           tctx.font=`bold ${fs}px sans-serif`;
-          tctx.strokeStyle=lum>128?"rgba(0,0,0,.9)":"rgba(255,255,255,.9)";
-          tctx.lineWidth=Math.max(2,fs/3);
+          // Clean outline: thin white/black halo for contrast
+          tctx.strokeStyle=lum>128?"rgba(255,255,255,.9)":"rgba(255,255,255,.9)";
+          tctx.lineWidth=2.5;
           tctx.strokeText(String(num),cx,cy);
-          tctx.fillStyle=lum>128?"#111":"#fff";
+          tctx.fillStyle=lum>128?"#000":"#000";
           tctx.fillText(String(num),cx,cy);
         }
         openPrintWindow(tc.toDataURL("image/png"));
