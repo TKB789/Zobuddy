@@ -6464,14 +6464,13 @@ const NotebookPanel=()=>{
     // Auto-extend canvas when drawing near the bottom
     if(drawY>c.height-60){
       const newH=c.height+300;
-      const snap=c.toDataURL();
+      const imgData=ctx.getImageData(0,0,c.width,c.height);
       c.height=newH;c.style.height=newH+"px";drawCanvasHeightRef.current=newH;
-      const img=new Image();img.onload=()=>{ctx.drawImage(img,0,0);
-        // Restore drawing state after resize
-        if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
-        else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=colorRef.current;ctx.fillStyle=colorRef.current;ctx.lineWidth=sizeRef.current;}
-        ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();ctx.moveTo((t.clientX-r.left)*sx,drawY);
-      };img.src=snap;
+      ctx.putImageData(imgData,0,0);
+      // Restore drawing state after resize
+      if(eraserRef.current){ctx.globalCompositeOperation="destination-out";ctx.lineWidth=eraserSizeRef.current;}
+      else{ctx.globalCompositeOperation="source-over";ctx.strokeStyle=colorRef.current;ctx.fillStyle=colorRef.current;ctx.lineWidth=sizeRef.current;}
+      ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();ctx.moveTo((t.clientX-r.left)*sx,drawY);
     }},[]);
   const onUp=React.useCallback((e)=>{
     // Flush pending dot for single tap
@@ -6489,7 +6488,11 @@ const NotebookPanel=()=>{
     drawPinchDist.current=null;drawStartPos.current=null;drawScrollRef.current=null;
     if(!isDrawingRef.current){saveCanvas();return;}isDrawingRef.current=false;
     const c=drawCanvasRef.current;if(c)c.getContext("2d").globalCompositeOperation="source-over";saveCanvas();},[]);
-  const canvasCallbackRef=React.useCallback((node)=>{if(node){drawCanvasRef.current=node;
+  const canvasCallbackRef=React.useCallback((node)=>{if(node){
+    // If this is the same node we already set up, skip re-init
+    if(drawCanvasRef.current===node)return;
+    drawCanvasRef.current=node;
+    node.width=360;
     const h=getDrawCanvasHeight();node.height=h;node.style.height=h+"px";drawCanvasHeightRef.current=h;
     node.addEventListener("touchstart",onDown,{passive:false});node.addEventListener("touchmove",onMove,{passive:false});
     node.addEventListener("touchend",onUp);node.addEventListener("mousedown",onDown);
@@ -8320,7 +8323,7 @@ const NotebookPanel=()=>{
                 fontFamily:baseTs.fontFamily||"'Nunito',sans-serif",
                 color:"rgba(232,224,240,.4)",whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0,
                 boxSizing:"border-box"}}>{textRef.current}</div>;})()}
-              <canvas ref={canvasCallbackRef} width={360} height={600}
+              <canvas ref={canvasCallbackRef}
                 style={{width:"100%",touchAction:"none",background:"transparent",display:"block",position:"relative",zIndex:1}}/>
             </div>}
           </PageBg>
