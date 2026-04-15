@@ -6962,7 +6962,7 @@ const NotebookPanel=()=>{
     pageIdxRef.current=nbPageIdx;
     const d=readNb();const page=d.pages?.[nbPageIdx];
     textRef.current=page?.content||"";
-    if(textareaRef.current)textareaRef.current.value=textRef.current;
+    if(textareaRef.current){textareaRef.current.value=textRef.current;setTimeout(autoGrowTextarea,0);}
     drawImgRef.current=null;drawCanvasRef.current=null;
     setPageDrawMode(false);setPageZoom(1);setRenaming(false);undoRef.current=[textRef.current];redoRef.current=[];pixelUndoRef.current=[];pixelRedoRef.current=[];drawUndoStack.current=[];drawRedoStack.current=[];
   },[nbPageIdx]);
@@ -6971,13 +6971,13 @@ const NotebookPanel=()=>{
   useEffect(()=>{if(nbView!=="page")return;const iv=setInterval(saveAll,5000);return()=>clearInterval(iv);},[nbView,nbPageIdx]);
 
   // ─── TEXT INPUT ─────────────────────────────────────────────────
-  const onTextInput=()=>{const el=textareaRef.current;if(!el)return;textRef.current=el.value;
+  const onTextInput=()=>{const el=textareaRef.current;if(!el)return;textRef.current=el.value;autoGrowTextarea();
     clearTimeout(saveTimerRef.current);saveTimerRef.current=setTimeout(()=>{
       saveText();undoRef.current=[...undoRef.current.slice(-49),textRef.current];redoRef.current=[];},1500);};
   const undo=()=>{if(undoRef.current.length<2)return;const cur=undoRef.current.pop();redoRef.current.push(cur);const prev=undoRef.current[undoRef.current.length-1];
-    textRef.current=prev;if(textareaRef.current)textareaRef.current.value=prev;saveText();};
+    textRef.current=prev;if(textareaRef.current)textareaRef.current.value=prev;saveText();autoGrowTextarea();};
   const redo=()=>{if(!redoRef.current.length)return;const next=redoRef.current.pop();undoRef.current.push(next);
-    textRef.current=next;if(textareaRef.current)textareaRef.current.value=next;saveText();};
+    textRef.current=next;if(textareaRef.current)textareaRef.current.value=next;saveText();autoGrowTextarea();};
 
   // ─── NAVIGATION ─────────────────────────────────────────────────
   const goToc=()=>{saveAll();saveVecDraw();syncState();setPageDrawMode(false);setPageZoom(1);vecDrawCanvasRef.current=null;setNbView("toc");};
@@ -7000,7 +7000,8 @@ const NotebookPanel=()=>{
     return(
     <div style={{position:"relative",background:bg,borderRadius:8,border:"1px solid "+(light?"rgba(0,0,0,.1)":"rgba(255,255,255,.06)"),width:"100%",minHeight:600}}>
       {type==="lined"&&<svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
-        {Array.from({length:50},(_,i)=><line key={i} x1="0" y1={28+i*28} x2="100%" y2={28+i*28} stroke={lineColor} strokeWidth="1"/>)}</svg>}
+        <defs><pattern id="lined28" width="100%" height="28" patternUnits="userSpaceOnUse" x="0" y="28"><line x1="0" y1="28" x2="100%" y2="28" stroke={lineColor} strokeWidth="1"/></pattern></defs>
+        <rect width="100%" height="100%" fill="url(#lined28)"/></svg>}
       {type==="square"&&<svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
         <defs><pattern id="sq8" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="0" cy="0" r="1" fill={dotColor}/><circle cx="24" cy="0" r="1" fill={dotColor}/><circle cx="0" cy="24" r="1" fill={dotColor}/><circle cx="24" cy="24" r="1" fill={dotColor}/></pattern></defs>
         <rect width="100%" height="100%" fill="url(#sq8)"/></svg>}
@@ -7015,7 +7016,8 @@ const NotebookPanel=()=>{
   const ts=(type,bgColor)=>({width:"100%",minHeight:600,padding:type==="lined"?"6px 14px":type==="square"?"2px 14px":type==="hex"?"13px 14px":"14px",
     background:"transparent",border:"none",color:isLightBg(bgColor)?"#1a1a2e":"#e8e0f0",fontSize:15,
     lineHeight:type==="lined"?"28px":type==="square"?"24px":type==="hex"?"35px":"1.6",
-    outline:"none",resize:"none",fontFamily:"'Nunito',sans-serif"});
+    outline:"none",resize:"none",fontFamily:"'Nunito',sans-serif",overflow:"hidden"});
+  const autoGrowTextarea=()=>{const el=textareaRef.current;if(!el)return;el.style.height="auto";el.style.height=Math.max(600,el.scrollHeight)+"px";};
   const btn=(extra)=>({background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"6px 12px",fontSize:13,color:"#ccc",cursor:"pointer",fontWeight:700,...extra});
 
   // ─── PASSWORD / ARCHIVE ─────────────────────────────────────────
@@ -8252,14 +8254,14 @@ const NotebookPanel=()=>{
         <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:`${100/pageZoom}%`}}>
           <PageBg type={page.type} bgColor={page.bgColor}>
             {!pageDrawMode&&<div style={{position:"relative"}}>
-              {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",height:"auto",maxHeight:600,pointerEvents:"none",opacity:.7,zIndex:2}}/>}
+              {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",height:"auto",pointerEvents:"none",opacity:.7,zIndex:2}}/>}
               <textarea ref={(el)=>{if(el){
                 const curIdx=String(pageIdxRef.current);
                 if(el.dataset.loadedIdx!==curIdx){
                   const d=readNb();const content=d.pages?.[pageIdxRef.current]?.content||"";
                   textRef.current=content;el.value=content;el.dataset.loadedIdx=curIdx;
                 }
-                textareaRef.current=el;}}
+                textareaRef.current=el;el.style.height="auto";el.style.height=Math.max(600,el.scrollHeight)+"px";}}
               } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type,page.bgColor),position:"relative",zIndex:1}}/>
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}} ref={(el)=>{
