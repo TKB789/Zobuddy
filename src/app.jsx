@@ -8315,7 +8315,6 @@ const NotebookPanel=()=>{
           <div style={pageBgStyle(page.bgColor)}>
             {pageBgSvg(page.type,page.bgColor)}
             {!pageDrawMode&&<div style={{position:"relative"}}>
-              {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",height:"auto",pointerEvents:"none",opacity:.7,zIndex:2}}/>}
               <textarea ref={(el)=>{if(el){
                 const curIdx=String(pageIdxRef.current);
                 if(el.dataset.loadedIdx!==curIdx){
@@ -8324,6 +8323,12 @@ const NotebookPanel=()=>{
                 }
                 textareaRef.current=el;el.style.height="auto";el.style.height=Math.max(600,el.scrollHeight)+"px";}}
               } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type,page.bgColor),position:"relative",zIndex:1}}/>
+              {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",pointerEvents:"none",opacity:.7,zIndex:2}} onLoad={(e)=>{
+                // Force image to match textarea height to prevent aspect-ratio scaling misalignment
+                const ta=textareaRef.current;
+                if(ta)e.target.style.height=ta.offsetHeight+"px";
+                else e.target.style.height="100%";
+              }}/>}
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}} ref={(el)=>{
               if(el&&canvasCallbackRef){
