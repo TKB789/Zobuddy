@@ -8341,10 +8341,12 @@ const NotebookPanel=()=>{
                 textareaRef.current=el;el.style.height="auto";el.style.height=Math.max(600,el.scrollHeight)+"px";}}
               } onInput={onTextInput} onBlur={()=>saveText()} placeholder="Start writing..." style={{...ts(page.type,page.bgColor),position:"relative",zIndex:1}}/>
               {existingDraw&&<img src={existingDraw} style={{position:"absolute",top:0,left:0,width:"100%",pointerEvents:"none",opacity:.7,zIndex:2}} onLoad={(e)=>{
-                // Force image to match textarea height to prevent aspect-ratio scaling misalignment
+                // Set image height based on its natural aspect ratio at container width to match canvas dimensions
+                const imgEl=e.target;const cw=imgEl.parentElement?.offsetWidth||imgEl.offsetWidth;
+                if(imgEl.naturalWidth>0){imgEl.style.height=Math.round(imgEl.naturalHeight*(cw/imgEl.naturalWidth))+"px";}
+                // Also ensure textarea is at least as tall as the drawing
                 const ta=textareaRef.current;
-                if(ta)e.target.style.height=ta.offsetHeight+"px";
-                else e.target.style.height="100%";
+                if(ta){const drawH=parseInt(imgEl.style.height)||0;if(drawH>ta.offsetHeight){ta.style.height=drawH+"px";}}
               }}/>}
             </div>}
             {pageDrawMode&&<div style={{position:"relative"}} ref={(el)=>{
