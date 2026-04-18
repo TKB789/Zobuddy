@@ -8398,11 +8398,11 @@ const NotebookPanel=()=>{
                 if(existingCanvas&&existingCanvas.width!==cw){}
               }
             }}>
-              {(()=>{const baseTs=ts(page.type,page.bgColor);return <div ref={drawTextMeasureRef} style={{position:"absolute",top:0,left:0,width:"100%",minHeight:600,
+              {(()=>{const baseTs=ts(page.type,page.bgColor);const textColor=isLightBg(page.bgColor)?"rgba(26,26,46,.45)":"rgba(232,224,240,.4)";return <div ref={drawTextMeasureRef} style={{position:"absolute",top:0,left:0,width:"100%",minHeight:600,
                 padding:baseTs.padding,fontSize:`${baseTs.fontSize||15}px`,
                 lineHeight:baseTs.lineHeight,
                 fontFamily:baseTs.fontFamily||"'Nunito',sans-serif",
-                color:"rgba(232,224,240,.4)",whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0,
+                color:textColor,whiteSpace:"pre-wrap",wordBreak:"break-word",pointerEvents:"none",zIndex:0,
                 boxSizing:"border-box"}}>{textRef.current}</div>;})()}
               <canvas ref={canvasCallbackRef}
                 style={{width:"100%",touchAction:"none",background:"transparent",display:"block",position:"relative",zIndex:1}}/>
