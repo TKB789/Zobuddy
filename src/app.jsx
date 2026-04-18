@@ -8339,7 +8339,13 @@ const NotebookPanel=()=>{
         <div style={{transform:`scale(${pageZoom})`,transformOrigin:"top left",width:"100%"}}>
           <div style={pageBgStyle(page.bgColor)}>
             {pageBgSvg(page.type,page.bgColor)}
-            {!pageDrawMode&&<div style={{position:"relative"}}>
+            {!pageDrawMode&&<div style={{position:"relative",cursor:"text"}} onClick={(e)=>{
+              // If the user tapped the textarea itself, let iOS handle cursor placement normally.
+              // If they tapped the surrounding area (placeholder space below the last line),
+              // focus the textarea and put the cursor at the end of the text.
+              const ta=textareaRef.current;if(!ta)return;
+              if(e.target!==ta){ta.focus();const len=ta.value.length;ta.setSelectionRange(len,len);}
+            }}>
               <textarea ref={(el)=>{if(el){
                 const curIdx=String(pageIdxRef.current);
                 if(el.dataset.loadedIdx!==curIdx){
