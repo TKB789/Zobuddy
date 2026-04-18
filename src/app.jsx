@@ -6198,6 +6198,8 @@ const NotebookPanel=()=>{
   const[nbSetPw,setNbSetPw]=useState("");
   const[nbSetPw2,setNbSetPw2]=useState("");
   const[nbExpandedIdx,setNbExpandedIdx]=useState(null);
+  const[nbSearchOpen,setNbSearchOpen]=useState(false);
+  const[nbSearchQuery,setNbSearchQuery]=useState("");
   const[nbPreviewMode,setNbPreviewMode]=useState(()=>{try{return ZobuddyDB.get("zobuddy_nb_preview")!=="false";}catch{return true;}});
   const togglePreviewMode=()=>{const nv=!nbPreviewMode;setNbPreviewMode(nv);try{ZobuddyDB.set("zobuddy_nb_preview",String(nv));}catch{}};
 
@@ -8421,7 +8423,11 @@ const NotebookPanel=()=>{
         <button onClick={()=>setNbView("newpw")} style={btn({fontSize:11,padding:"4px 8px",color:"#888"})}>{nbData.pwHash?"🔐":"🔓"}</button>
       </div></div>
     <div style={{background:"rgba(102,126,234,.06)",border:"1px solid rgba(102,126,234,.15)",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
-      <input value={nbNewTitle} onChange={e=>setNbNewTitle(e.target.value)} placeholder="Page title" style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none",marginBottom:6}}/>
+      <div style={{display:"flex",gap:6,marginBottom:6}}>
+        <input value={nbNewTitle} onChange={e=>setNbNewTitle(e.target.value)} placeholder="Page title" style={{flex:1,minWidth:0,padding:"8px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none"}}/>
+        <button onClick={()=>{const nv=!nbSearchOpen;setNbSearchOpen(nv);if(!nv)setNbSearchQuery("");}} title="Search notes" style={{width:40,flexShrink:0,padding:"0 8px",borderRadius:8,border:nbSearchOpen?"1px solid rgba(102,126,234,.5)":"1px solid rgba(255,255,255,.08)",background:nbSearchOpen?"rgba(102,126,234,.15)":"rgba(255,255,255,.04)",color:nbSearchOpen?"#a8b4f0":"#888",fontSize:15,cursor:"pointer"}}>🔎</button>
+      </div>
+      {nbSearchOpen&&<input autoFocus value={nbSearchQuery} onChange={e=>setNbSearchQuery(e.target.value)} placeholder="Search titles & content…" style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid rgba(102,126,234,.3)",background:"rgba(255,255,255,.04)",color:"#e8e0f0",fontSize:14,outline:"none",marginBottom:6,boxSizing:"border-box"}}/>}
       <div style={{display:"flex",gap:4,marginBottom:6}}>
         {[{id:"lined",label:"📝 Note"},{id:"art",label:"🎨 Art"}].map(t=>(
           <button key={t.id} onClick={()=>setNbNewType(t.id)}
@@ -8451,7 +8457,13 @@ const NotebookPanel=()=>{
         style={{width:"100%",background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",border:"none",borderRadius:10,padding:"8px",fontSize:14,fontWeight:700,cursor:"pointer"}}>+ Add Page</button>
     </div>
     {nbData.pages.length===0&&<div style={{textAlign:"center",opacity:.3,padding:20}}>No pages yet</div>}
-    {nbData.pages.map((p,i)=>{
+    {(()=>{
+      const q=nbSearchQuery.trim().toLowerCase();
+      // Keep original index so clicking a filtered result opens the correct page.
+      const pairs=nbData.pages.map((p,i)=>({p,i}));
+      const matches=q?pairs.filter(({p})=>(p.title||"").toLowerCase().includes(q)||(p.content||"").toLowerCase().includes(q)):pairs;
+      if(q&&matches.length===0)return <div style={{textAlign:"center",opacity:.3,padding:20,fontSize:13}}>No matches for "{nbSearchQuery}"</div>;
+      return matches.map(({p,i})=>{
       const isExpanded=nbPreviewMode&&nbExpandedIdx===i;
       const openPage=()=>{drawImgRef.current=null;drawCanvasRef.current=null;drawLiveSnapshot.current=null;pageIdxRef.current=i;setNbPageIdx(i);setNbView("page");};
       return(<div key={i} style={{background:isExpanded?"rgba(255,255,255,.05)":"rgba(255,255,255,.03)",border:isExpanded?"1px solid rgba(102,126,234,.2)":"1px solid rgba(255,255,255,.06)",borderRadius:10,padding:"10px 12px",marginBottom:4,cursor:"pointer"}}>
@@ -8498,7 +8510,7 @@ const NotebookPanel=()=>{
           <button onClick={(e)=>{e.stopPropagation();if(!confirm(`Delete "${p.title}"?`))return;const d=readNb();d.pages.splice(i,1);saveNb(d);setNbExpandedIdx(null);}}
             style={{padding:"6px 12px",borderRadius:8,background:"rgba(245,87,108,.08)",border:"1px solid rgba(245,87,108,.15)",color:"#f5576c",fontSize:12,fontWeight:700,cursor:"pointer"}}>🗑️</button>
         </div></div>}
-      </div>);})}
+      </div>);});})()}
   </div>);
 };
 
